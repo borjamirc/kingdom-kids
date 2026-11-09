@@ -240,6 +240,12 @@ SPRITES_ARENDELLE = {
     'olaf': dict(src='olaf_sheet.png', height=38, colors=18, body=[20, 30], lift={5: 6},
                  anims={'walk': [0, 3]}, poses={'throw': 4, 'air': 5}, fps={'walk': 9}),
 }
+SPRITES_SEOUL = {
+    'demon': dict(src='demon_sheet.png', height=38, colors=20, body=[22, 30],
+                  anims={'walk': [0, 3]}, poses={'crouch': 4, 'rest': 5}, fps={'walk': 10}),
+    'derpy': dict(src='derpy_sheet.png', height=32, colors=22, body=[30, 22], lift={5: 6},
+                  anims={'walk': [0, 3]}, poses={'crouch': 4, 'pounce': 5}, fps={'walk': 10}),
+}
 
 # Per-world sources and settings. Each world reads art/gen/<src> and writes
 # art/world/<id>. Terrain: (level letter, texture, colours, tone, top edge),
@@ -260,6 +266,13 @@ WORLDS = {
                                ('R', 'ice_tex.png', 14, {'mul': [0.86, 0.92, 0.98], 'sat': 0.62}, 'rim'),
                                ('I', 'lake_tex.png', 12, None, 'rim')],
                       slippery=['I'], trees=('pines.png', [134, 156, 120], 20), shared_from='pride'),
+    # World 3, the K-pop demon hunters' city: tiled hanok roofs over brick,
+    # glass towers, neon platforms, speaker bounce pads and beat platforms.
+    'seoul': dict(src='art/gen/seoul', out='art/world/seoul', sprites=SPRITES_SEOUL,
+                  terrain=[('G', 'earth_tex.png', 14, {'mul': [1.3, 1.22, 1.3], 'sat': 1.0}, 'lip'),
+                           ('R', 'rock_tex.png', 16, None, 'rim')],
+                  slippery=[], trees=('decor.png', [126, 84, 136], 22), shared_from='pride',
+                  bounce_w=50, bounce_key='flood', crumble_src='platform.png', beat=True),
 }
 CFG = WORLDS['pride']
 
@@ -711,6 +724,63 @@ def cracked_platform():
     return img.astype(np.uint8), surface
 
 
+def build_beat():
+    """Beat platforms (World 3): 4 tiles of this world's platform art, two
+    frames -- the neon in hot pink for group 1, in cyan for group 2."""
+    sheet = np.asarray(Image.open(f'{WORLD}/platform.png').convert('RGBA')).astype(np.float64)
+    path, world = world_meta()
+    fw = world['platform']['frame'][0]
+    piece = lambda i: sheet[:, i * fw:(i + 1) * fw]
+    img = np.concatenate([piece(1), piece(2), piece(3), piece(5)], 1)
+    rgb, a = img[..., :3], img[..., 3]
+    mx, mn = rgb.max(-1), rgb.min(-1)
+    sat = (mx - mn) / np.maximum(mx, 1)
+    neon = (a > 0) & (mx > 120) & (sat > 0.35)
+    lum = (rgb @ np.array([0.299, 0.587, 0.114])) / 255.0
+    frames = []
+    solid = a > 0
+    # The walking surface: the first two solid rows of each column.
+    top = np.zeros_like(solid)
+    for x in range(solid.shape[1]):
+        ys = np.where(solid[:, x])[0]
+        if len(ys) > 2:
+            top[ys[0] + 1:ys[0] + 3, x] = True
+    for hue in ((255, 70, 170), (60, 230, 255)):
+        f = img.copy()
+        h = np.array(hue, np.float64)
+        # The whole slab leans toward the group's colour, so it reads at a glance...
+        f[solid, :3] = f[solid, :3] * 0.7 + h * 0.3
+        t = np.clip(lum[neon] * 1.5, 0, 1)[:, None]
+        f[neon, :3] = h * (0.55 + 0.45 * t) + 255 * np.clip(t - 0.75, 0, 1) * 1.6
+        # ...with a glowing neon top edge you can stand on.
+        f[top, :3] = h * 0.75 + 255 * 0.25
+        frames.append(np.clip(f, 0, 255))
+    out = np.concatenate(frames, 1).astype(np.uint8)
+    Image.fromarray(out, 'RGBA').save(f'{WORLD}/beat.png')
+    world['beat'] = {'frame': [img.shape[1], img.shape[0]], 'surface': world['platform']['surface']}
+    json.dump(world, open(path, 'w'), indent=2)
+    print('  beat:', img.shape[1], 'x', img.shape[0], 'x2')
+
+
+STAGE_H = 150
+
+
+def build_stage():
+    """A backdrop behind the Keyhole (World 3's concert stage)."""
+    rgb, alpha = load_keyed('stage_src.png')
+    lab, n = ndimage.label(alpha >= 0.5, structure=ST8)
+    sizes = np.bincount(lab.ravel()); sizes[0] = 0
+    big = [k for k in range(1, n + 1) if sizes[k] > 400]          # drop specks
+    owner = np.isin(lab, big).astype(int)
+    fig = cut_figure(rgb, alpha, owner, 1)
+    px = pixel_sprite(fig, (STAGE_H - 2) / fig.shape[0], 28)
+    Image.fromarray(px, 'RGBA').save(f'{WORLD}/stage.png')
+    path, world = world_meta()
+    world['stage'] = {'size': [px.shape[1], px.shape[0]]}
+    json.dump(world, open(path, 'w'), indent=2)
+    print('  stage:', px.shape[1], 'x', px.shape[0])
+
+
 def load_flood(name, tol=90):
     """Background = the magenta reachable from the image border; everything
     the dark outline encloses stays, whatever its colour (a pink belly too)."""
@@ -866,6 +936,10 @@ def build_scenery():
             share(*shared)
         else:
             print('  no source', src)
+    if CFG.get('beat'):
+        build_beat()
+    if os.path.exists(f'{SRC}/stage_src.png'):
+        build_stage()
 
 
 PARTS = {'bg': [build_far, build_mid], 'kids': [build_kids], 'sprites': [build_sprites],

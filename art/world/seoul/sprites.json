@@ -1,0 +1,46 @@
+{
+  "demon": {
+    "frame": [
+      36,
+      42
+    ],
+    "body": [
+      22,
+      30
+    ],
+    "anims": {
+      "walk": [
+        0,
+        3
+      ]
+    },
+    "fps": {
+      "walk": 10
+    },
+    "source": "generated",
+    "crouch": 4,
+    "rest": 5
+  },
+  "derpy": {
+    "frame": [
+      44,
+      36
+    ],
+    "body": [
+      30,
+      22
+    ],
+    "anims": {
+      "walk": [
+        0,
+        3
+      ]
+    },
+    "fps": {
+      "walk": 10
+    },
+    "source": "generated",
+    "crouch": 4,
+    "pounce": 5
+  }
+}

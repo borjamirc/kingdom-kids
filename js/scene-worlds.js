@@ -58,18 +58,23 @@ GAME.WorldScene = class WorldScene extends Phaser.Scene {
     const c = GAME.byId(this.charId) || GAME.CHARACTERS[0];
     this.add.image(28, H - 12, GAME.portraitKey(c)).setOrigin(0.5, 1).setScale(0.5);
 
-    const n = GAME.WORLDS.length, cw = 232, chh = 130, gap = 28;
+    const n = GAME.WORLDS.length, gap = n > 2 ? 16 : 28;
+    const cw = Math.min(232, Math.floor((W - 40 - (n - 1) * gap) / n)), chh = n > 2 ? 112 : 130;
+    this.cw = cw; this.chh = chh;
     const x0 = Math.round(W / 2 - (n * cw + (n - 1) * gap) / 2);
     this.cards = GAME.WORLDS.map((w, i) => {
-      const x = x0 + i * (cw + gap), y = 78;
+      const x = x0 + i * (cw + gap), y = n > 2 ? 72 : 78;
       // A 1:1 window onto the world's far background (no scaling, so the
-      // pixels stay crisp): the part named by `thumb`, or the middle.
+      // pixels stay crisp): centred on the spot named by `thumb` (the
+      // top-left of a 232x130 window), or the middle.
       const far = this.add.image(0, 0, w.id + '-far').setOrigin(0);
-      const [tx, ty] = w.thumb || [Math.round((far.width - cw) / 2), 80];
+      const [tx, ty] = w.thumb
+        ? [Math.round(w.thumb[0] + (232 - cw) / 2), Math.round(w.thumb[1] + (130 - chh) / 2)]
+        : [Math.round((far.width - cw) / 2), 80];
       far.setCrop(tx, ty, cw, chh).setPosition(x - tx, y - ty);
       const frame = this.add.graphics();
       const name = GAME.text(this, x + cw / 2, y + chh + 10, w.name.toUpperCase(), 8, '#fff3d0').setOrigin(0.5, 0);
-      GAME.text(this, x + 6, y + chh + 24, 'WORLD ' + (i + 1), 8, '#9a92b0').setOrigin(0, 0);
+      if (n <= 2) GAME.text(this, x + 6, y + chh + 24, 'WORLD ' + (i + 1), 8, '#9a92b0').setOrigin(0, 0);
       // Star Gems found here: three slots, lit or dark.
       const got = GAME.progress.gems(w.id);
       for (let g = 0; g < 3; g++) {
@@ -79,8 +84,9 @@ GAME.WorldScene = class WorldScene extends Phaser.Scene {
       // Best coin percentage, once there is one.
       const pct = GAME.progress.coins(w.id);
       if (pct > 0) {
-        this.add.image(x + cw / 2 - 22, y + chh + 28, 'munny').setOrigin(0.5);
-        GAME.text(this, x + cw / 2 - 14, y + chh + 24, pct + '%', 8, pct >= 100 ? '#ffe27a' : '#fff3d0').setOrigin(0, 0);
+        const cx = n <= 2 ? x + cw / 2 - 22 : x + 10;
+        this.add.image(cx, y + chh + 28, 'munny').setOrigin(0.5);
+        GAME.text(this, cx + 8, y + chh + 24, pct + '%', 8, pct >= 100 ? '#ffe27a' : '#fff3d0').setOrigin(0, 0);
       }
       if (GAME.progress.sealed(w.id)) {
         const k = this.add.image(x + cw - 18, y + 22, w.id + '-keyhole').setScale(0.5);
@@ -115,7 +121,7 @@ GAME.WorldScene = class WorldScene extends Phaser.Scene {
       const on = i === j;
       c.frame.clear();
       c.frame.lineStyle(on ? 3 : 2, on ? 0xffd27c : 0x5a4a78, 1)
-        .strokeRect(c.x - 2, c.y - 2, 236, 134);
+        .strokeRect(c.x - 2, c.y - 2, this.cw + 4, this.chh + 4);
       c.name.setColor(on ? '#ffffff' : '#9a92b0');
     });
   }

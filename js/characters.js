@@ -105,24 +105,33 @@ GAME.WORLDS = [
     friend: 'simba', charger: 'hyena', thumb: [470, 160] },
   { id: 'arendelle', name: 'Arendelle', level: 'levels/arendelle.txt', art: 'art/world/arendelle',
     friend: 'olaf', charger: 'wolf', thumb: [475, 40] },
+  { id: 'seoul', name: 'Neon Seoul', level: 'levels/neon_seoul.txt', art: 'art/world/seoul',
+    friend: 'derpy', charger: 'demon', thumb: [128, 81] },
 ];
 
 /* The Disney friends. 'pounce' leaps onto the enemy; 'throw' lobs a snowball. */
 GAME.FRIENDS = {
   simba: { help: 'pounce', shout: 'RAWR!', heart: 'ROAR!' },
   olaf:  { help: 'throw', shout: 'SNOWBALL!', heart: 'WARM HUGS!' },
+  derpy: { help: 'pounce', shout: 'RAWR!', heart: 'TIGER HUG!' },
 };
 
 /* Charging enemies (GAME.Hyena behaviour) and what they say. */
 GAME.CHARGERS = {
   hyena: { growl: 'GRR!', beaten: 'YIP!' },
   wolf:  { growl: 'GRRR!', beaten: 'AWOO!' },
+  demon: { growl: 'HEHEHE!', beaten: 'EEEK!' },
 };
 
 /* World 2 toys. */
 GAME.BOUNCE = 690;          // snow bounce pad launch speed (~190px high)
 GAME.CRUMBLE = { shakeMs: 650, goneMs: 2600 };
 GAME.ICE = { grip: 0.06 };  // on slippery ice, speed moves this much toward the target per frame
+
+/* World 3: beat platforms come and go with the music, four beats to a bar.
+ * Group 1 is gone on beat 4, group 2 on beat 2 -- never both at once, and
+ * each blinks for a whole beat before it goes. */
+GAME.BEAT = { beatMs: 750, on: { 1: [1, 1, 1, 0], 2: [1, 0, 1, 1] } };
 
 GAME.byId = function (id) {
   return GAME.CHARACTERS.find(function (c) { return c.id === id; });

@@ -68,6 +68,52 @@ GAME.Mover = class Mover {
  * corner). Stand on it and it shivers for a moment, then cracks and drops;
  * a few seconds later it freezes back into place. Only the top is solid.
  * ------------------------------------------------------------------------- */
+/** A beat platform (World 3): 4 tiles of neon that come and go with the
+ *  music. Group 1 glows pink, group 2 cyan (see GAME.BEAT). While it's gone
+ *  a faint ghost shows where it will come back. */
+GAME.Beat = class Beat {
+  constructor(scene, x, y, group) {
+    this.scene = scene;
+    this.group = group;
+    const meta = scene.worldMeta.beat || { surface: 0 };
+    const s = scene.physics.add.image(x, y - meta.surface, scene.world.id + '-beat', group - 1)
+      .setOrigin(0, 0).setDepth(2);
+    const b = s.body;
+    b.setAllowGravity(false).setImmovable(true);
+    b.moves = false;
+    b.setSize(s.width, 8).setOffset(0, meta.surface);
+    b.checkCollision.down = false; b.checkCollision.left = false; b.checkCollision.right = false;
+    this.sprite = s;
+    // A soft glow that pulses on every beat.
+    this.glow = scene.add.rectangle(s.x - 3, s.y - 3, s.width + 6, s.height + 6, group === 1 ? 0xff4fb0 : 0x3fe6ff, 1)
+      .setOrigin(0, 0).setDepth(1).setAlpha(0).setBlendMode(Phaser.BlendModes.ADD);
+    this.on = true;
+    this.lastBeat = -1;
+  }
+
+  riding(pb) { return GAME.Mover.prototype.riding.call(this, pb); }
+
+  /** Is this group there on beat n? */
+  static isOn(group, n) { return !!GAME.BEAT.on[group][((n % 4) + 4) % 4]; }
+
+  update(time) {
+    const B = GAME.BEAT, s = this.sprite;
+    const n = Math.floor(time / B.beatMs), t = (time % B.beatMs) / B.beatMs;
+    const on = Beat.isOn(this.group, n), next = Beat.isOn(this.group, n + 1);
+    if (on !== this.on) {
+      this.on = on;
+      s.body.enable = on;
+      if (on) s.body.updateFromGameObject();
+      this.scene.fx.sparkles(s.x + s.width / 2, s.y + 4, this.group === 1 ? 0xff7fc8 : 0x7ff0ff, on ? 6 : 4);
+    }
+    const blink = Math.floor(time / 90) % 2;
+    if (on) s.setAlpha(next ? 1 : (blink ? 0.35 : 1));            // about to go: blink
+    else s.setAlpha(t > 0.5 && blink ? 0.5 : 0.14);                // a faint ghost, flickering back
+    if (n !== this.lastBeat) { this.lastBeat = n; if (on) this.glow.setAlpha(0.32); }
+    else this.glow.setAlpha(Math.max(0, this.glow.alpha - 0.025));
+  }
+};
+
 GAME.Crumble = class Crumble {
   constructor(scene, x, y) {
     this.scene = scene;

@@ -17,7 +17,7 @@ GAME.Level = {
   VARIANTS: 1,                    // texture variants per axis (by world position)
   LEDGE: 16,                      // single, left, mid, right
   SOLID_MAX: 15,                  // up to here collide on every side; ledges are one-way
-  OBJECTS: 'PHYmhSKTMVCBX',
+  OBJECTS: 'PHYmhSKTMVCBX12',
 
   configure(ts) {
     if (!ts) return;
@@ -73,7 +73,7 @@ GAME.Level = {
   /** World position for an object: standing things sit on the tile below;
    *  a moving platform is placed by its top-left corner. */
   place(o, T) {
-    if (o.type === 'M' || o.type === 'V' || o.type === 'C') return { x: o.tx * T, y: o.ty * T };
+    if ('MVC12'.includes(o.type)) return { x: o.tx * T, y: o.ty * T };
     const standing = 'PHYSKTBX'.includes(o.type);
     return {
       x: o.tx * T + T / 2,

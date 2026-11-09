@@ -75,7 +75,12 @@ GAME.PreloadScene = class PreloadScene extends Phaser.Scene {
       }
       if (meta.mover) this.load.image(w.id + '-mover', d + 'mover.png');
       if (meta.crumble) this.load.image(w.id + '-crumble', d + 'crumble.png');
+      if (meta.beat) {
+        this.load.spritesheet(w.id + '-beat', d + 'beat.png',
+          { frameWidth: meta.beat.frame[0], frameHeight: meta.beat.frame[1] });
+      }
       if (meta.bounce) this.load.image(w.id + '-bounce', d + 'bounce.png');
+      if (meta.stage) this.load.image(w.id + '-stage', d + 'stage.png');
       if (meta.tileset && meta.tileset.fringe) this.load.image(w.id + '-fringe', d + 'grass_fringe.png');
       const sf = (meta.savepoint && meta.savepoint.frame) || [40, 12];
       this.load.spritesheet(w.id + '-savepoint', d + 'savepoint.png', { frameWidth: sf[0], frameHeight: sf[1] });

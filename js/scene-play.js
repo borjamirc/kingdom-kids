@@ -54,7 +54,7 @@ GAME.PlayScene = class PlayScene extends Phaser.Scene {
     // Phaser reuses this scene object on every run, so anything a previous run
     // left set (a finished sealing, the old Keyhole) must be cleared here.
     this.enemies = []; this.pickups = []; this.saves = []; this.movers = [];
-    this.crumbles = []; this.bounces = []; this.chests = [];
+    this.crumbles = []; this.bounces = []; this.chests = []; this.beats = [];
     // Each chest holds a Star Gem; they're numbered left to right, whatever
     // row they're on.
     const chestOrder = lvl.objects.filter(o => o.type === 'X').sort((a, b) => a.tx - b.tx);
@@ -82,6 +82,7 @@ GAME.PlayScene = class PlayScene extends Phaser.Scene {
       else if (o.type === 'H') this.enemies.push(new GAME.Shadow(this, p.x, p.y));
       else if (o.type === 'Y') this.enemies.push(new GAME.Hyena(this, p.x, p.y, w.charger || 'hyena'));
       else if (o.type === 'C') this.crumbles.push(new GAME.Crumble(this, p.x, p.y));
+      else if (o.type === '1' || o.type === '2') this.beats.push(new GAME.Beat(this, p.x, p.y, +o.type));
       else if (o.type === 'B') this.addBounce(p.x, p.y);
       else if (o.type === 'X') this.addChest(p.x, p.y, chestOrder.indexOf(o));
       else if (o.type === 'm') this.addPickup('munny', p.x, p.y - (grass(o.tx, o.ty) ? 5 : 0));
@@ -106,6 +107,7 @@ GAME.PlayScene = class PlayScene extends Phaser.Scene {
     this.physics.add.collider(pl, this.layer);
     for (const m of this.movers) this.physics.add.collider(pl, m.sprite);
     for (const k of this.crumbles) this.physics.add.collider(pl, k.sprite);
+    for (const k of this.beats) this.physics.add.collider(pl, k.sprite);
     this.player = pl;
 
     this.blade = this.add.image(0, 0, 'keyblade').setOrigin(5.5 / 30, 5.5 / 14).setDepth(16).setVisible(false);
@@ -121,6 +123,7 @@ GAME.PlayScene = class PlayScene extends Phaser.Scene {
 
     this.friend = new GAME.Companion(this, spawn.x, spawn.y - 1, w.friend);
     for (const k of this.crumbles) this.physics.add.collider(this.friend.sprite, k.sprite);
+    for (const k of this.beats) this.physics.add.collider(this.friend.sprite, k.sprite);
     this.riders = [pl, this.friend.sprite];
 
     // --- camera -------------------------------------------------------------
@@ -200,6 +203,7 @@ GAME.PlayScene = class PlayScene extends Phaser.Scene {
     this.updateParallax();
     for (const m of this.movers) m.update(time, delta, this.riders);
     for (const k of this.crumbles) k.update(time, this.riders);
+    for (const k of this.beats) k.update(this.time.now);      // the scene clock: pauses with the game
     this.checkBounces();
 
     const onGround = b.blocked.down || b.touching.down;
@@ -623,6 +627,10 @@ GAME.PlayScene = class PlayScene extends Phaser.Scene {
 
   // --- the Keyhole --------------------------------------------------------------
   addKeyhole(x, y) {
+    // A world can stand a backdrop behind it (Neon Seoul's concert stage).
+    if (this.textures.exists(this.world.id + '-stage')) {
+      this.add.image(x, y + 1, this.world.id + '-stage').setOrigin(0.5, 1).setDepth(-4);
+    }
     // Floats a little above the ground, its bottom tip about 30px up.
     const k = this.add.image(x, 0, this.world.id + '-keyhole').setDepth(4);
     k.y = Math.round(y - 30 - k.height / 2);

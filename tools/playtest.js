@@ -66,6 +66,7 @@ window.PT = (() => {
     s.fellInPit = () => { falls++; log.push(frame + ': fell at x=' + Math.round(s.player.x)); pit(); };
     s.enemies.forEach(e => { const h = e.hit.bind(e); e.hit = d => { hits++; h(d); }; });
 
+    const steady = k => k.on && GAME.Beat.isOn(k.group, Math.floor(s.time.now / GAME.BEAT.beatMs) + 1);
     drive(s, () => {
       const p = s.player, b = p.body, onG = b.blocked.down || b.touching.down;
       const press = {};
@@ -98,8 +99,9 @@ window.PT = (() => {
         const tall = wall && wallAt(p.x + 20, p.y - 6 * T);
         const gap = onG && !floorAhead(p.x + 30, p.y);
         const elev = s.movers.find(m => m.dy && Math.abs(m.sprite.x + m.sprite.width / 2 - p.x) < 320);
-        // A bounce pad just behind a wall too tall to jump: step back onto it.
-        const pad = s.bounces.find(pd => pd.x < p.x && p.x - pd.x < 80);
+        // A bounce pad behind a wall too tall to jump: go back onto it (the
+        // nearest one; from Neon Seoul's street that's a long walk back).
+        const pad = s.bounces.filter(pd => pd.x < p.x && p.x - pd.x < 400).sort((a, c) => c.x - a.x)[0];
         if (tall && !elev && pad && onG) { press.right = false; press.left = true; }
         if (tall && elev) useElev = elev;
         if (useElev) {
@@ -107,6 +109,11 @@ window.PT = (() => {
           const cx = elev.sprite.x + elev.sprite.width / 2, atBottom = Math.abs(elev.sprite.y - elev.y0) < 6;
           press.right = p.x < cx - 12; press.left = p.x > cx + 12;
           if (Math.abs(p.x - cx) < 20 && atBottom && onG && jumpHold === 0) jumpHold = 8;
+        } else if (gap && s.beats.some(k => Math.abs(k.sprite.y - p.y) < 8 && k.sprite.x > p.x && k.sprite.x - p.x < 70)) {
+          // A short hop across to a beat platform, once it's there to stay.
+          const k = s.beats.find(k => Math.abs(k.sprite.y - p.y) < 8 && k.sprite.x > p.x && k.sprite.x - p.x < 70);
+          press.right = jumpHold > 0;
+          if (steady(k) && jumpHold === 0) { jumpHold = 9; press.right = true; }
         } else if (gap) {
           const slider = s.movers.find(m => m.dx && m.sprite.x > p.x - 40 && m.sprite.x - p.x < 220);
           if (slider) {
@@ -116,6 +123,11 @@ window.PT = (() => {
             if (jumpHold > 0) press.right = true;
           } else if (jumpHold === 0) jumpHold = 22;
         } else if (onG && wall && jumpHold === 0) jumpHold = 22;
+        // Beat platforms: don't step onto the next one unless it's there and
+        // not about to go.
+        const at = x => s.beats.find(k => Math.abs(k.sprite.y - p.y) < 8 && x >= k.sprite.x && x <= k.sprite.x + k.sprite.width);
+        const ahead = at(p.x + 22), under = at(p.x);
+        if (onG && ahead && ahead !== under && !steady(ahead) && jumpHold === 0) press.right = false;
       }
       if (jumpHold > 0) { press.jump = true; jumpHold--; }
       return press;
