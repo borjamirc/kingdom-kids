@@ -860,7 +860,7 @@ GAME.PlayScene = class PlayScene extends Phaser.Scene {
       GAME.button(this, W / 2 - bw - gap, y, bw, bh, 'PLAY', () => this.closeMenu(), Object.assign({ icon: 'playicon', iconW: 40 }, opts)),
       GAME.button(this, W / 2, y, bw, bh, 'WORLDS', () => go('worlds', { characterId: this.char.id }),
         Object.assign({ icon: this.world.id + '-keyhole', iconScale: 0.7, iconW: 40 }, opts)),
-      GAME.button(this, W / 2 + bw + gap, y, bw, bh, 'KIDS', () => go('select'),
+      GAME.button(this, W / 2 + bw + gap, y, bw, bh, 'CHARACTERS', () => go('select'),
         Object.assign({ icon: kid, iconScale: 0.45, iconW: 40 }, opts)),
     ];
   }

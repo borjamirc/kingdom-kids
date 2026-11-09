@@ -56,7 +56,7 @@ GAME.WorldScene = class WorldScene extends Phaser.Scene {
     title.setOrigin(0.5, 0).setShadow(2, 2, '#3a1a3a', 0, false, true);
 
     const c = GAME.byId(this.charId) || GAME.CHARACTERS[0];
-    // The kid you're playing: tap them (or the KIDS button) to pick another.
+    // The kid you're playing: tap them (or the CHARACTERS button) to pick another.
     this.add.image(28, H - 12, GAME.portraitKey(c)).setOrigin(0.5, 1).setScale(0.5)
       .setInteractive({ useHandCursor: true }).on('pointerdown', () => this.scene.start('select'));
 
@@ -101,7 +101,7 @@ GAME.WorldScene = class WorldScene extends Phaser.Scene {
       return { w, x, y, frame, name };
     });
 
-    GAME.button(this, W - 62, H - 26, 100, 32, '< KIDS', () => this.scene.start('select'), { pad: 12 });
+    GAME.button(this, W - 76, H - 26, 128, 32, '< CHARACTERS', () => this.scene.start('select'), { pad: 12 });
 
     this.index = 0;
     // Start on the first world not sealed yet.
