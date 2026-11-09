@@ -34,6 +34,7 @@ GAME.FRIEND = {
 GAME.Companion = class Companion {
   constructor(scene, x, y, key = 'simba') {
     this.scene = scene;
+    if (!scene.spriteMeta[key]) key = 'simba';      // a friend whose art isn't there yet
     this.key = key;
     this.cfg = GAME.FRIENDS[key] || GAME.FRIENDS.simba;
     const m = this.meta = scene.spriteMeta[key];
@@ -296,14 +297,15 @@ GAME.Companion = class Companion {
     s.setFlipX(best.sprite.x < s.x);
     sc.fx.say(s.x, s.y - 40, this.cfg.shout);
     const sx = s.x + (best.sprite.x < s.x ? -8 : 8), sy = s.y - 28;
-    const ball = sc.add.image(sx, sy, 'snowball').setDepth(13);
+    const ball = sc.add.image(sx, sy, this.cfg.ball || 'snowball').setDepth(13);
+    const arc = this.cfg.arc !== undefined ? this.cfg.arc : 30;
     const prog = { t: 0 };
     sc.tweens.add({
       targets: prog, t: 1, duration: 420, delay: 120,
       onUpdate: () => {
         const ex = best.sprite.x, ey = best.sprite.y - 12;
         ball.x = sx + (ex - sx) * prog.t;
-        ball.y = sy + (ey - sy) * prog.t - Math.sin(prog.t * Math.PI) * 30;
+        ball.y = sy + (ey - sy) * prog.t - Math.sin(prog.t * Math.PI) * arc;
         ball.angle += 12;
       },
       onComplete: () => {

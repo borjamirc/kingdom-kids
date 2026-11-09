@@ -1,0 +1,24 @@
+{
+  "goblin": {
+    "frame": [
+      38,
+      35
+    ],
+    "body": [
+      24,
+      28
+    ],
+    "anims": {
+      "walk": [
+        0,
+        3
+      ]
+    },
+    "fps": {
+      "walk": 10
+    },
+    "source": "generated",
+    "crouch": 4,
+    "rest": 5
+  }
+}

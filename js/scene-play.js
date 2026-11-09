@@ -23,6 +23,7 @@ GAME.PlayScene = class PlayScene extends Phaser.Scene {
     this.spriteMeta = GAME.SPRITES;
     this.registerAnims();
     this.makeSnowball();
+    this.makeWebTextures();
 
     // --- level --------------------------------------------------------------
     this.worldMeta = this.cache.json.get(w.id + '-meta') || {};
@@ -55,6 +56,7 @@ GAME.PlayScene = class PlayScene extends Phaser.Scene {
     // left set (a finished sealing, the old Keyhole) must be cleared here.
     this.enemies = []; this.pickups = []; this.saves = []; this.movers = [];
     this.crumbles = []; this.bounces = []; this.chests = []; this.beats = [];
+    this.webs = []; this.web = null; this.rope = null;   // the old rope went with the old scene
     // Each chest holds a Star Gem; they're numbered left to right, whatever
     // row they're on.
     const chestOrder = lvl.objects.filter(o => o.type === 'X').sort((a, b) => a.tx - b.tx);
@@ -84,6 +86,7 @@ GAME.PlayScene = class PlayScene extends Phaser.Scene {
       else if (o.type === 'C') this.crumbles.push(new GAME.Crumble(this, p.x, p.y));
       else if (o.type === '1' || o.type === '2') this.beats.push(new GAME.Beat(this, p.x, p.y, +o.type));
       else if (o.type === 'B') this.addBounce(p.x, p.y);
+      else if (o.type === 'W') this.addWeb(p.x, p.y);
       else if (o.type === 'X') this.addChest(p.x, p.y, chestOrder.indexOf(o));
       else if (o.type === 'm') this.addPickup('munny', p.x, p.y - (grass(o.tx, o.ty) ? 5 : 0));
       else if (o.type === 'h') this.addPickup('heart', p.x, p.y);
@@ -121,10 +124,14 @@ GAME.PlayScene = class PlayScene extends Phaser.Scene {
     this.invulnUntil = 0; this.knockUntil = 0;
     this.busy = false;                  // fainting, respawning or sealing
 
-    this.friend = new GAME.Companion(this, spawn.x, spawn.y - 1, w.friend);
-    for (const k of this.crumbles) this.physics.add.collider(this.friend.sprite, k.sprite);
-    for (const k of this.beats) this.physics.add.collider(this.friend.sprite, k.sprite);
-    this.riders = [pl, this.friend.sprite];
+    // Most worlds have a Disney friend; one (Spider City) leaves the kid on their own.
+    this.friend = w.friend ? new GAME.Companion(this, spawn.x, spawn.y - 1, w.friend) : null;
+    this.riders = [pl];
+    if (this.friend) {
+      for (const k of this.crumbles) this.physics.add.collider(this.friend.sprite, k.sprite);
+      for (const k of this.beats) this.physics.add.collider(this.friend.sprite, k.sprite);
+      this.riders.push(this.friend.sprite);
+    }
 
     // --- camera -------------------------------------------------------------
     const cam = this.cameras.main;
@@ -136,7 +143,8 @@ GAME.PlayScene = class PlayScene extends Phaser.Scene {
     // --- input + hud ----------------------------------------------------------
     this.controls = new GAME.Controls(this);
     this.buildHud();
-    this.input.keyboard.on('keydown-ESC', () => this.scene.start('worlds', { characterId: this.char.id }));
+    this.menu = null;
+    this.input.keyboard.on('keydown-ESC', () => (this.menu ? this.closeMenu() : this.openMenu()));
   }
 
   /** Floating platforms drawn from their art pieces over the (hidden)
@@ -198,6 +206,7 @@ GAME.PlayScene = class PlayScene extends Phaser.Scene {
 
   // ===========================================================================
   update(time, delta) {
+    if (this.menu) return;                       // paused under the menu
     const c = this.char, p = this.player, b = p.body, ctl = this.controls, M = GAME.MOVE;
     ctl.update();
     this.updateParallax();
@@ -212,7 +221,9 @@ GAME.PlayScene = class PlayScene extends Phaser.Scene {
     this.wasOnGround = onGround;
     if (this.landTimer > 0) this.landTimer -= delta;
 
-    if (!this.busy) {
+    if (!this.busy && this.web) {
+      this.updateWeb(time, ctl);
+    } else if (!this.busy) {
       if (ctl.pressed('jump')) this.lastJumpPress = time;
       const knocked = time < this.knockUntil;
 
@@ -242,6 +253,7 @@ GAME.PlayScene = class PlayScene extends Phaser.Scene {
       if (b.velocity.y >= 0) this.jumpCut = false;
 
       if (ctl.pressed('attack') && !this.swing) this.startSwing(time);
+      if (!onGround && !knocked && this.webs.length) this.tryWeb(time);
     } else {
       b.setVelocityX(0);
     }
@@ -261,7 +273,7 @@ GAME.PlayScene = class PlayScene extends Phaser.Scene {
       this.checkKeyhole();
       if (p.y > this.levelH + 24) this.fellInPit();
     }
-    this.friend.update(time, delta, p, this.hearts);
+    if (this.friend) this.friend.update(time, delta, p, this.hearts);
     if (time < this.invulnUntil) p.setAlpha(Math.floor(time / 70) % 2 ? 0.35 : 1);
     else p.setAlpha(1);
   }
@@ -353,7 +365,8 @@ GAME.PlayScene = class PlayScene extends Phaser.Scene {
         if (!b || !b.enable || b.velocity.y < 0) continue;
         // The friend only takes a pad when he's trying to get up somewhere --
         // not when his resting spot happens to be on top of it.
-        if (r === this.friend.sprite && !this.friend.wantsUp) continue;
+        if (this.friend && r === this.friend.sprite && !this.friend.wantsUp) continue;
+        if (r === this.player && this.web) continue;
         if (b.right < pad.x - pad.w / 2 + 6 || b.left > pad.x + pad.w / 2 - 6) continue;
         if (b.bottom < pad.y - pad.h + 2 || b.bottom > pad.y + 3) continue;
         b.setVelocityY(-GAME.BOUNCE);
@@ -364,6 +377,81 @@ GAME.PlayScene = class PlayScene extends Phaser.Scene {
         this.fx.sparkles(pad.x, pad.y - pad.h, 0xdff4ff, 8);
       }
     }
+  }
+
+  // --- web swings (World 4) ------------------------------------------------------
+  /** A web anchor: a little white web stuck to the underside of something. */
+  addWeb(x, y) {
+    const img = this.add.image(x, y, 'webanchor').setDepth(3);
+    this.tweens.add({ targets: img, scale: 1.15, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    this.webs.push({ x, y, img, lastAt: -99999 });
+  }
+
+  /** In the air near an anchor (and below it): grab the web. */
+  tryWeb(time) {
+    const p = this.player, b = p.body, W = GAME.WEB;
+    const grip = this.char.figure[1] * 0.85;
+    for (const w of this.webs) {
+      if (time - w.lastAt < W.cooldownMs) continue;
+      const dx = p.x - w.x, dy = p.y - grip - w.y;
+      if (dy < 20) continue;                                   // hands must be below it
+      const d = Math.hypot(dx, dy);
+      if (d > W.reach) continue;
+      const dir = Math.abs(b.velocity.x) > 20 ? Math.sign(b.velocity.x) : this.facing;
+      const th0 = Math.atan2(dx, dy) * dir;                    // < 0: behind the anchor
+      if (th0 > W.endAngle - 0.45) continue;                   // already past it
+      this.web = { w, R: Phaser.Math.Clamp(d, W.minLen, W.maxLen), th0, dir, start: time, grip };
+      this.swing = null; this.jumpCut = false; this.facing = dir;
+      b.setAllowGravity(false);
+      if (!this.rope) this.rope = this.add.graphics().setDepth(14);
+      this.fx.sparkles(w.x, w.y, 0xffffff, 6);
+      this.fx.say(w.x, w.y - 18, 'THWIP!');
+      return;
+    }
+  }
+
+  updateWeb(time, ctl) {
+    const s = this.web, p = this.player, b = p.body, W = GAME.WEB;
+    const t = Math.min(1, (time - s.start) / W.swingMs);
+    const k = (1 - Math.cos(Math.PI * t)) / 2;                   // a pendulum: fast at the bottom
+    const th = (s.th0 + (W.endAngle - s.th0) * k) * s.dir;
+    const gx = s.w.x + s.R * Math.sin(th), gy = s.w.y + s.R * Math.cos(th);
+    // Steer by velocity, so walls and floors still stop the kid.
+    b.setVelocity((gx - p.x) * 60, (gy + s.grip - p.y) * 60);
+    this.rope.clear();
+    this.rope.lineStyle(3, 0x3a3a4a, 1).lineBetween(s.w.x, s.w.y, p.x, p.y - s.grip);
+    this.rope.lineStyle(1, 0xffffff, 1).lineBetween(s.w.x, s.w.y, p.x, p.y - s.grip);
+    const bumped = time - s.start > 60 && (b.blocked.left || b.blocked.right || b.blocked.down || b.blocked.up);
+    if (bumped) this.releaseWeb(time, false);
+    else if (t >= 1 || ctl.pressed('jump')) this.releaseWeb(time, true);
+  }
+
+  /** Let go: flung forward and up (or just dropped, after bumping into something). */
+  releaseWeb(time, fling) {
+    const s = this.web, b = this.player.body;
+    if (!s) return;
+    this.web = null;
+    s.w.lastAt = time;
+    b.setAllowGravity(true);
+    if (fling) b.setVelocity(s.dir * GAME.WEB.fling[0], GAME.WEB.fling[1]);
+    else b.setVelocity(0, 0);
+    this.lastGround = -9999; this.lastJumpPress = -9999; this.jumpCut = false;
+    if (this.rope) this.rope.clear();
+  }
+
+  /** A web anchor: a tiny texture made once. */
+  makeWebTextures() {
+    if (this.textures.exists('webanchor')) return;
+    const g = this.make.graphics({ x: 0, y: 0, add: false });
+    g.fillStyle(0x3a3a4a).fillCircle(7, 7, 7);
+    g.lineStyle(1, 0xffffff, 1);
+    for (let i = 0; i < 8; i++) {
+      const a = i * Math.PI / 4;
+      g.lineBetween(7, 7, 7 + Math.cos(a) * 6, 7 + Math.sin(a) * 6);
+    }
+    g.strokeCircle(7, 7, 3); g.strokeCircle(7, 7, 5.5);
+    g.generateTexture('webanchor', 14, 14);
+    g.destroy();
   }
 
   /** Olaf's snowballs: a tiny texture made once. */
@@ -390,6 +478,11 @@ GAME.PlayScene = class PlayScene extends Phaser.Scene {
   updateAnim(onGround) {
     const c = this.char, p = this.player;
     if (this.sealing) return;            // seal() holds the Keyblade-raised pose
+    if (this.web) {                      // hanging on the web, arms up
+      p.anims.stop();
+      p.setTexture(GAME.sheetKey(c, 'jump'), this.jumpFrame(-GAME.MOVE.jump * 0.6));
+      return;
+    }
     if (this.swing) {
       p.anims.stop();
       const f = this.swing.gen ? Math.max(0, this.slashFrame(this.time.now - this.swing.start)) : 0;
@@ -514,6 +607,7 @@ GAME.PlayScene = class PlayScene extends Phaser.Scene {
 
   hurt(fromX, time) {
     if (time < this.invulnUntil || this.busy) return;
+    if (this.web) this.releaseWeb(time, false);
     const C = GAME.COMBAT, b = this.player.body;
     this.hearts = Math.max(0, this.hearts - 1);
     this.drawHearts();
@@ -539,6 +633,7 @@ GAME.PlayScene = class PlayScene extends Phaser.Scene {
 
   /** Fade, reappear at the last save point, fade back in. */
   backToSave() {
+    if (this.web) this.releaseWeb(this.time.now, false);
     this.busy = true;
     const cam = this.cameras.main;
     cam.fadeOut(260, 0, 0, 0);
@@ -549,7 +644,7 @@ GAME.PlayScene = class PlayScene extends Phaser.Scene {
       this.swing = null;
       this.drawHearts();
       this.invulnUntil = this.time.now + 1000;
-      this.friend.reset(p.x, p.y);
+      if (this.friend) this.friend.reset(p.x, p.y);
       cam.fadeIn(300, 0, 0, 0);
       this.busy = false;
     });
@@ -649,6 +744,7 @@ GAME.PlayScene = class PlayScene extends Phaser.Scene {
 
   /** The kid raises the Keyblade, a beam locks the Keyhole, the world is safe. */
   seal() {
+    if (this.web) this.releaseWeb(this.time.now, false);
     const k = this.keyhole, p = this.player, c = this.char;
     this.busy = true; this.sealing = true; this.swing = null;
     this.facing = k.x >= p.x ? 1 : -1;
@@ -734,9 +830,50 @@ GAME.PlayScene = class PlayScene extends Phaser.Scene {
       }
       this.drawGems();
     }
-    const menu = GAME.text(this, W - 8, 8, 'MENU', 8, '#fff3d0').setOrigin(1, 0)
-      .setScrollFactor(0).setDepth(1000).setStroke('#2a1220', 3).setInteractive({ useHandCursor: true });
-    menu.on('pointerdown', () => this.scene.start('worlds', { characterId: this.char.id }));
+    // MENU: big enough for a small finger (the old 8px text was a 35x9px
+    // target on a phone). It pauses and asks: play on, another world, another kid.
+    GAME.button(this, W - 38, 18, 60, 26, 'MENU', () => this.openMenu(), { pad: 14 });
+  }
+
+  openMenu() {
+    if (this.menu || this.sealing) return;
+    const W = GAME.WORLD.width, H = GAME.WORLD.height, D = 3000;
+    this.physics.world.pause();
+    this.tweens.pauseAll();
+    this.anims.pauseAll();
+    const dim = this.add.rectangle(0, 0, W, H, 0x120a1e, 0.78).setOrigin(0).setScrollFactor(0).setDepth(D)
+      .setInteractive();                                   // swallows taps behind the menu
+    const title = GAME.text(this, W / 2, 70, 'PAUSED', 16, '#fff3d0').setOrigin(0.5).setScrollFactor(0).setDepth(D + 1);
+    const y = 170, bw = 170, bh = 64, gap = 18;
+    const go = (scene, data) => { this.closeMenu(); this.scene.start(scene, data); };
+    const opts = { depth: D + 2, size: 8, pad: 6, alpha: 1 };
+    const kid = GAME.portraitKey(this.char);
+    if (!this.textures.exists('playicon')) {                  // a big gold "play" triangle
+      const g = this.make.graphics({ x: 0, y: 0, add: false });
+      g.fillStyle(0x2a1220).fillTriangle(0, 0, 0, 24, 21, 12);
+      g.fillStyle(0xffd27c).fillTriangle(2, 4, 2, 20, 16, 12);
+      g.generateTexture('playicon', 22, 24);
+      g.destroy();
+    }
+    this.menu = [
+      { destroy: () => dim.destroy() }, { destroy: () => title.destroy() },
+      GAME.button(this, W / 2 - bw - gap, y, bw, bh, 'PLAY', () => this.closeMenu(), Object.assign({ icon: 'playicon', iconW: 40 }, opts)),
+      GAME.button(this, W / 2, y, bw, bh, 'WORLDS', () => go('worlds', { characterId: this.char.id }),
+        Object.assign({ icon: this.world.id + '-keyhole', iconScale: 0.7, iconW: 40 }, opts)),
+      GAME.button(this, W / 2 + bw + gap, y, bw, bh, 'KIDS', () => go('select'),
+        Object.assign({ icon: kid, iconScale: 0.45, iconW: 40 }, opts)),
+    ];
+  }
+
+  closeMenu() {
+    if (!this.menu) return;
+    this.menu.forEach(m => m.destroy());
+    this.menu = null;
+    this.physics.world.resume();
+    this.tweens.resumeAll();
+    this.anims.resumeAll();
+    // Taps on the menu must not turn into a jump or a swing.
+    this.controls.byPointer = {}; this.controls.latch = this.controls.blank();
   }
 
   /** Share of this level's coins collected, 0-100 (100 only when all are). */

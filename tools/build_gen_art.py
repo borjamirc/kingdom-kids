@@ -119,14 +119,14 @@ ATTACK_OUT = 'art/gen/attack'
 SLASH_CHARS = ['Baltazar', 'Francisco', 'Jo', 'Olimpia', 'Pedro', 'Sara']
 
 
-def find_figures(alpha, n, by_x=False):
+def find_figures(alpha, n, by_x=False, min_ratio=0.2):
     """The n biggest shapes, with stray bits (a dangling keychain, a blade tip
     the generator drew detached) given to the nearest of them."""
     solid = alpha >= 0.5
     lab, cnt = ndimage.label(solid, structure=ST8)
     sizes = np.bincount(lab.ravel()); sizes[0] = 0
     order = list(np.argsort(sizes)[::-1][:n])
-    if len(order) < n or sizes[order[-1]] < 0.2 * sizes[order[0]]:
+    if len(order) < n or sizes[order[-1]] < min_ratio * sizes[order[0]]:
         raise SystemExit(f'expected {n} figures, found sizes {sorted(sizes)[-6:]}')
     boxes = ndimage.find_objects(lab)
     owner = np.zeros_like(lab)
@@ -246,6 +246,10 @@ SPRITES_SEOUL = {
     'derpy': dict(src='derpy_sheet.png', height=32, colors=22, body=[30, 22], lift={5: 6},
                   anims={'walk': [0, 3]}, poses={'crouch': 4, 'pounce': 5}, fps={'walk': 10}),
 }
+SPRITES_SPIDER = {
+    'goblin': dict(src='goblin_sheet.png', height=36, colors=20, body=[24, 28],
+                   anims={'walk': [0, 3]}, poses={'crouch': 4, 'rest': 5}, fps={'walk': 10}),
+}
 
 # Per-world sources and settings. Each world reads art/gen/<src> and writes
 # art/world/<id>. Terrain: (level letter, texture, colours, tone, top edge),
@@ -273,6 +277,14 @@ WORLDS = {
                            ('R', 'rock_tex.png', 16, None, 'rim')],
                   slippery=[], trees=('decor.png', [126, 84, 136], 22), shared_from='pride',
                   bounce_w=50, bounce_key='flood', crumble_src='platform.png', beat=True),
+    # World 4, the spider hero's city: sunny rooftops of brick under stone
+    # parapets, stone towers, steel girders and a web trampoline.
+    'spider': dict(src='art/gen/spider', out='art/world/spider', sprites=SPRITES_SPIDER,
+                   terrain=[('G', 'earth_tex.png', 14, None, 'lip'),
+                            ('R', 'rock_tex.png', 16, None, 'rim')],
+                   slippery=[], trees=('decor.png', [118, 150, 92], 22), shared_from='pride',
+                   bounce_w=52, crumble_src='platform.png', platform='girder', bounce_unpink=True,
+                   trees_min_ratio=0.08),                 # the antenna mast is thin
 }
 CFG = WORLDS['pride']
 
@@ -665,12 +677,51 @@ def platform_pieces(src):
     return left, mid, right, surface
 
 
+def girder_pieces():
+    """World 4's steel I-beam, drawn straight at pixel size (the generators
+    kept drawing it tilted, then flagged it): (left cap, 48px wrapping
+    middle, right cap, surface row), 26px tall with the dark outline."""
+    C = {'hi': (255, 150, 90), 'top': (226, 86, 46), 'face': (200, 70, 38), 'web': (172, 56, 32),
+         'shade': (130, 40, 24), 'deep': (96, 30, 20), 'hole': (52, 22, 20),
+         'rivet': (255, 186, 120), 'rivs': (110, 34, 20)}
+    H, W = 26, 48 + 32
+    g = np.zeros((H, W, 4), np.uint8)
+    g[..., 3] = 255
+    def fill(y0, y1, x0, x1, c):
+        g[y0:y1, x0:x1, :3] = C[c] if c in C else c
+    fill(0, H, 0, W, OUTLINE)
+    fill(1, H - 1, 0, W, 'web')
+    fill(1, 2, 0, W, 'hi'); fill(2, 4, 0, W, 'top'); fill(4, 5, 0, W, 'shade'); fill(5, 6, 0, W, 'deep')
+    fill(19, 20, 0, W, 'face'); fill(20, 23, 0, W, 'top'); fill(23, 25, 0, W, 'deep')
+    yy, xx = np.mgrid[0:H, 0:W]
+    for x0 in range(16, 16 + 48, 24):                    # two bays in the middle piece
+        fill(6, 19, x0, x0 + 2, 'face'); fill(6, 19, x0 + 2, x0 + 3, 'shade')
+        cx, cy, r = x0 + 13.5, 12, 3.6
+        d2 = (xx - cx) ** 2 + (yy - cy) ** 2
+        g[d2 <= r * r, :3] = C['hole']
+        g[(d2 <= (r + 1) ** 2) & (d2 > r * r) & (yy > cy), :3] = C['face']
+    for x in range(4, W - 4, 8):
+        for y in (2, 21):
+            g[y, x, :3] = C['rivet']; g[y, x + 1, :3] = C['rivs']
+    # end caps: a darker end plate with the outline
+    for x in (0,):
+        fill(1, H - 1, 1, 3, 'shade')
+    g[:, 0, :3] = OUTLINE
+    left = g[:, 0:16].copy()
+    mid = g[:, 16:64].copy()
+    right = left[:, ::-1].copy()
+    return left, mid, right, 1
+
+
 def build_platform():
     """Floating platform pieces, all PLATFORM_H tall: single, left cap, three
     middles that wrap, right cap. The game draws a ledge run from these (the
     ledge tiles only provide the collision), and a moving platform is
     left + three middles + right."""
-    left, mid, right, surface = platform_pieces('platform.png')
+    if CFG.get('platform') == 'girder':
+        left, mid, right, surface = girder_pieces()
+    else:
+        left, mid, right, surface = platform_pieces('platform.png')
     h = left.shape[0]
     single = np.concatenate([left[:, :TILE // 2], right[:, TILE // 2:]], 1)
     pieces = [single, left] + [mid[:, i * TILE:(i + 1) * TILE] for i in range(3)] + [right]
@@ -807,6 +858,12 @@ def build_bounce():
     alpha = np.maximum(alpha, owner)
     fig = cut_figure(rgb, alpha, owner, 1)
     px = pixel_sprite(fig, (CFG.get('bounce_w', BOUNCE_W) - 2) / fig.shape[1], 16)
+    if CFG.get('bounce_unpink'):
+        # A white web over magenta comes out pink: give it back its white.
+        f = px[..., :3].astype(np.float64)
+        pink = (px[..., 3] > 0) & (np.minimum(f[..., 0], f[..., 2]) - f[..., 1] > 25)
+        lum = f @ np.array([0.299, 0.587, 0.114])
+        px[pink, :3] = np.clip(np.stack([lum[pink] * 1.25 + 20] * 3, -1), 0, 255).astype(np.uint8)
     Image.fromarray(px, 'RGBA').save(f'{WORLD}/bounce.png')
     path, world = world_meta()
     world['bounce'] = {'size': [px.shape[1], px.shape[0]]}
@@ -817,7 +874,7 @@ def build_bounce():
 def build_trees():
     src, heights, ncol = CFG['trees']
     rgb, alpha = load_keyed(src)
-    owner, ids = find_figures(alpha, len(heights), by_x=True)
+    owner, ids = find_figures(alpha, len(heights), by_x=True, min_ratio=CFG.get('trees_min_ratio', 0.2))
     sizes = []
     for i, k in enumerate(ids):
         fig = cut_figure(rgb, alpha, owner, k)

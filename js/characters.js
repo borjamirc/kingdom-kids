@@ -107,6 +107,8 @@ GAME.WORLDS = [
     friend: 'olaf', charger: 'wolf', thumb: [475, 40] },
   { id: 'seoul', name: 'Neon Seoul', level: 'levels/neon_seoul.txt', art: 'art/world/seoul',
     friend: 'derpy', charger: 'demon', thumb: [128, 81] },
+  { id: 'spider', name: 'Spider City', level: 'levels/spider_city.txt', art: 'art/world/spider',
+    friend: null, charger: 'goblin', thumb: [128, 46] },     // here the kid is the web-swinger, on their own
 ];
 
 /* The Disney friends. 'pounce' leaps onto the enemy; 'throw' lobs a snowball. */
@@ -121,6 +123,7 @@ GAME.CHARGERS = {
   hyena: { growl: 'GRR!', beaten: 'YIP!' },
   wolf:  { growl: 'GRRR!', beaten: 'AWOO!' },
   demon: { growl: 'HEHEHE!', beaten: 'EEEK!' },
+  goblin: { growl: 'BZZT!', beaten: 'BOING!' },
 };
 
 /* World 2 toys. */
@@ -133,6 +136,13 @@ GAME.ICE = { grip: 0.06 };  // on slippery ice, speed moves this much toward the
  * each blinks for a whole beat before it goes. */
 GAME.BEAT = { beatMs: 750, on: { 1: [1, 1, 1, 0], 2: [1, 0, 1, 1] } };
 
+/* World 4: web anchors. Jump near one and the kid grabs the web by
+ * themselves, swings forward and is flung on -- no button needed (jump lets
+ * go early). reach: how far from the anchor a grab works; the swing runs
+ * from wherever you grabbed to endAngle (radians past straight down). */
+GAME.WEB = { reach: 150, minLen: 56, maxLen: 136, swingMs: 620, endAngle: 0.95,
+  fling: [230, -330], cooldownMs: 600 };
+
 GAME.byId = function (id) {
   return GAME.CHARACTERS.find(function (c) { return c.id === id; });
 };
@@ -143,6 +153,39 @@ GAME.portraitKey = function (c) { return c.id + '-portrait'; };
 GAME.animKey = function (c, anim) { return c.id + '-' + anim + '-anim'; };
 
 GAME.FONT = '"Press Start 2P", monospace';
+
+/** A button a small finger can hit on a phone: a rounded panel with a label
+ *  (and an optional icon image), and an invisible tap zone `pad` px bigger on
+ *  every side than what you see. Fixed to the screen. Returns its parts. */
+GAME.button = function (scene, x, y, w, h, label, onTap, opts = {}) {
+  const depth = opts.depth || 1000, pad = opts.pad !== undefined ? opts.pad : 12;
+  const g = scene.add.graphics().setScrollFactor(0).setDepth(depth);
+  const draw = (down) => {
+    g.clear();
+    g.fillStyle(down ? 0x5a3a7a : 0x2a1a3e, opts.alpha !== undefined ? opts.alpha : 0.85);
+    g.fillRoundedRect(x - w / 2, y - h / 2, w, h, 6);
+    g.lineStyle(2, 0xffd27c, 1).strokeRoundedRect(x - w / 2, y - h / 2, w, h, 6);
+  };
+  draw(false);
+  const parts = [g];
+  let tx = x;
+  if (opts.icon) {
+    const icon = scene.add.image(x - w / 2 + 6 + (opts.iconW || 20) / 2, y, opts.icon)
+      .setScale(opts.iconScale || 1).setScrollFactor(0).setDepth(depth + 1);
+    parts.push(icon);
+    tx = x + (opts.iconW || 20) / 2;
+  }
+  const t = GAME.text(scene, tx, y, label, opts.size || 8, '#fff3d0').setOrigin(0.5)
+    .setScrollFactor(0).setDepth(depth + 1);
+  parts.push(t);
+  const zone = scene.add.zone(x, y, w + pad * 2, h + pad * 2).setScrollFactor(0).setDepth(depth + 2)
+    .setInteractive({ useHandCursor: true });
+  zone.on('pointerdown', () => draw(true));
+  zone.on('pointerout', () => draw(false));
+  zone.on('pointerup', () => { draw(false); onTap(); });
+  parts.push(zone);
+  return { parts, zone, destroy: () => parts.forEach(o => o.destroy()) };
+};
 GAME.text = function (scene, x, y, str, size, color) {
   return scene.add.text(Math.round(x), Math.round(y), str, {
     fontFamily: GAME.FONT, fontSize: (size || 8) + 'px', color: color || '#ffffff',

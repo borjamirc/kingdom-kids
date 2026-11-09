@@ -56,9 +56,11 @@ GAME.WorldScene = class WorldScene extends Phaser.Scene {
     title.setOrigin(0.5, 0).setShadow(2, 2, '#3a1a3a', 0, false, true);
 
     const c = GAME.byId(this.charId) || GAME.CHARACTERS[0];
-    this.add.image(28, H - 12, GAME.portraitKey(c)).setOrigin(0.5, 1).setScale(0.5);
+    // The kid you're playing: tap them (or the KIDS button) to pick another.
+    this.add.image(28, H - 12, GAME.portraitKey(c)).setOrigin(0.5, 1).setScale(0.5)
+      .setInteractive({ useHandCursor: true }).on('pointerdown', () => this.scene.start('select'));
 
-    const n = GAME.WORLDS.length, gap = n > 2 ? 16 : 28;
+    const n = GAME.WORLDS.length, gap = n > 3 ? 12 : n > 2 ? 16 : 28;
     const cw = Math.min(232, Math.floor((W - 40 - (n - 1) * gap) / n)), chh = n > 2 ? 112 : 130;
     this.cw = cw; this.chh = chh;
     const x0 = Math.round(W / 2 - (n * cw + (n - 1) * gap) / 2);
@@ -78,13 +80,13 @@ GAME.WorldScene = class WorldScene extends Phaser.Scene {
       // Star Gems found here: three slots, lit or dark.
       const got = GAME.progress.gems(w.id);
       for (let g = 0; g < 3; g++) {
-        const star = this.add.image(x + cw - 50 + g * 20, y + chh + 28, 'gem').setOrigin(0.5);
+        const star = this.add.image(x + cw - (n > 3 ? 40 : 50) + g * (n > 3 ? 16 : 20), y + chh + 28, 'gem').setOrigin(0.5);
         if (!got.includes(g)) star.setTint(0x2a2440).setAlpha(0.8);
       }
       // Best coin percentage, once there is one.
       const pct = GAME.progress.coins(w.id);
       if (pct > 0) {
-        const cx = n <= 2 ? x + cw / 2 - 22 : x + 10;
+        const cx = n <= 2 ? x + cw / 2 - 22 : x + 8;
         this.add.image(cx, y + chh + 28, 'munny').setOrigin(0.5);
         GAME.text(this, cx + 8, y + chh + 24, pct + '%', 8, pct >= 100 ? '#ffe27a' : '#fff3d0').setOrigin(0, 0);
       }
@@ -99,9 +101,7 @@ GAME.WorldScene = class WorldScene extends Phaser.Scene {
       return { w, x, y, frame, name };
     });
 
-    const back = GAME.text(this, W - 10, H - 20, '< KIDS', 8, '#c9c2dc').setOrigin(1, 0)
-      .setInteractive({ useHandCursor: true });
-    back.on('pointerdown', () => this.scene.start('select'));
+    GAME.button(this, W - 62, H - 26, 100, 32, '< KIDS', () => this.scene.start('select'), { pad: 12 });
 
     this.index = 0;
     // Start on the first world not sealed yet.

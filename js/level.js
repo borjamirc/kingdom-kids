@@ -17,7 +17,7 @@ GAME.Level = {
   VARIANTS: 1,                    // texture variants per axis (by world position)
   LEDGE: 16,                      // single, left, mid, right
   SOLID_MAX: 15,                  // up to here collide on every side; ledges are one-way
-  OBJECTS: 'PHYmhSKTMVCBX12',
+  OBJECTS: 'PHYmhSKTMVCBX12W',
 
   configure(ts) {
     if (!ts) return;

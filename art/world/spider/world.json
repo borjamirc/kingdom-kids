@@ -1,0 +1,76 @@
+{
+  "tile": 16,
+  "tileset": {
+    "variants": 8,
+    "kindStride": 64,
+    "terrain": {
+      "G": 0,
+      "R": 512
+    },
+    "ledge": 1024,
+    "solidMax": 1023,
+    "count": 1028,
+    "fringe": 8,
+    "slippery": []
+  },
+  "platform": {
+    "frame": [
+      16,
+      26
+    ],
+    "surface": 1,
+    "mids": 3,
+    "frames": {
+      "single": 0,
+      "left": 1,
+      "mid": 2,
+      "right": 5
+    }
+  },
+  "mover": {
+    "size": [
+      80,
+      26
+    ],
+    "surface": 1
+  },
+  "crumble": {
+    "size": [
+      64,
+      26
+    ],
+    "surface": 1
+  },
+  "bounce": {
+    "size": [
+      50,
+      23
+    ]
+  },
+  "trees": [
+    [
+      51,
+      116
+    ],
+    [
+      14,
+      148
+    ],
+    [
+      54,
+      90
+    ]
+  ],
+  "savepoint": {
+    "frame": [
+      54,
+      27
+    ]
+  },
+  "keyhole": {
+    "size": [
+      53,
+      71
+    ]
+  }
+}
