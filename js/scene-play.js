@@ -54,7 +54,18 @@ GAME.PlayScene = class PlayScene extends Phaser.Scene {
     // Phaser reuses this scene object on every run, so anything a previous run
     // left set (a finished sealing, the old Keyhole) must be cleared here.
     this.enemies = []; this.pickups = []; this.saves = []; this.movers = [];
-    this.crumbles = []; this.bounces = [];
+    this.crumbles = []; this.bounces = []; this.chests = [];
+    // Each chest holds a Star Gem; they're numbered left to right, whatever
+    // row they're on.
+    const chestOrder = lvl.objects.filter(o => o.type === 'X').sort((a, b) => a.tx - b.tx);
+    this.coins = 0;
+    this.coinTotal = lvl.objects.filter(o => o.type === 'm').length;
+    // The grass tips stand 8px above a dirt top: a coin right on the ground
+    // floats a little higher so it never sits in them.
+    const G = GAME.Level.TERRAIN.G, grass = (x, y) => {
+      const i = y + 1 < lvl.h ? lvl.data[y + 1][x] : -1;
+      return i >= G && i < G + 4 * GAME.Level.KIND_STRIDE;
+    };
     const trees = (this.worldMeta.trees || [0]).length;
     // Tile index ranges that are slippery ice (a frozen lake).
     this.slippery = (this.worldMeta.tileset && this.worldMeta.tileset.slippery) || [];
@@ -72,7 +83,8 @@ GAME.PlayScene = class PlayScene extends Phaser.Scene {
       else if (o.type === 'Y') this.enemies.push(new GAME.Hyena(this, p.x, p.y, w.charger || 'hyena'));
       else if (o.type === 'C') this.crumbles.push(new GAME.Crumble(this, p.x, p.y));
       else if (o.type === 'B') this.addBounce(p.x, p.y);
-      else if (o.type === 'm') this.addPickup('munny', p.x, p.y);
+      else if (o.type === 'X') this.addChest(p.x, p.y, chestOrder.indexOf(o));
+      else if (o.type === 'm') this.addPickup('munny', p.x, p.y - (grass(o.tx, o.ty) ? 5 : 0));
       else if (o.type === 'h') this.addPickup('heart', p.x, p.y);
       else if (o.type === 'S') this.addSave(p.x, p.y);
       else if (o.type === 'K') this.addKeyhole(p.x, p.y);
@@ -101,7 +113,6 @@ GAME.PlayScene = class PlayScene extends Phaser.Scene {
 
     this.facing = 1;
     this.hearts = GAME.COMBAT.hearts;
-    this.munny = 0;
     this.swing = null;
     this.lastGround = 0; this.lastJumpPress = -9999;
     this.jumpCut = false; this.wasOnGround = true; this.landTimer = 0;
@@ -241,6 +252,7 @@ GAME.PlayScene = class PlayScene extends Phaser.Scene {
     if (!this.busy) {
       this.checkEnemyContact(time);
       this.checkPickups();
+      this.hintChests(time);
       this.checkSaves(time);
       this.checkKeyhole();
       if (p.y > this.levelH + 24) this.fellInPit();
@@ -248,6 +260,69 @@ GAME.PlayScene = class PlayScene extends Phaser.Scene {
     this.friend.update(time, delta, p, this.hearts);
     if (time < this.invulnUntil) p.setAlpha(Math.floor(time / 70) % 2 ? 0.35 : 1);
     else p.setAlpha(1);
+  }
+
+  // --- treasure chests and Star Gems -------------------------------------------
+  /** Three chests per level, each with a Star Gem inside: a Keyblade swing
+   *  opens one (the first thing the level teaches). */
+  addChest(x, y, index) {
+    if (!this.textures.exists('chest')) return;
+    const img = this.add.sprite(x, y + 1, 'chest', 0).setOrigin(0.5, 1).setDepth(5);
+    this.chests.push({ x, y, img, index, open: false, nextSparkle: 0 });
+  }
+
+  /** Closed chests glint now and then, so they're easy to spot. */
+  hintChests(time) {
+    for (const c of this.chests) {
+      if (c.open || time < c.nextSparkle) continue;
+      this.fx.rise(c.x + Phaser.Math.Between(-10, 10), c.y - 16, 0xffe27a);
+      c.nextSparkle = time + 420;
+    }
+  }
+
+  openChest(c) {
+    c.open = true;
+    c.img.setFrame(1);
+    this.tweens.add({ targets: c.img, scaleY: 1.15, duration: 90, yoyo: true });
+    this.fx.sparkles(c.x, c.y - 14, 0xffd23f, 12);
+    if (this.hearts < GAME.COMBAT.hearts) this.dropHeart(c.x, c.y - 20, c.x + 24);
+    if (this.textures.exists('gem') && c.index >= 0 && c.index < 3) this.popGem(c);
+  }
+
+  /** The Star Gem jumps out of its chest, shines, then flies up to its slot. */
+  popGem(c) {
+    const had = GAME.progress.gems(this.world.id).includes(c.index);
+    GAME.progress.addGem(this.world.id, c.index);      // kept even if you leave right now
+    const gem = this.add.image(c.x, c.y - 12, 'gem').setDepth(1001).setAlpha(had ? 0.6 : 1);
+    this.fx.say(c.x, c.y - 56, 'STAR GEM!');
+    this.cameras.main.flash(180, 255, 240, 180);
+    this.tweens.add({
+      targets: gem, y: c.y - 40, scale: 1.8, duration: 380, ease: 'Back.easeOut',
+      onComplete: () => {
+        this.fx.sparkles(gem.x, gem.y, 0xffe27a, 18);
+        this.time.delayedCall(260, () => {
+          // Hand it over to the HUD: same spot on screen, then off to its slot.
+          const cam = this.cameras.main, slot = this.gemIcons[c.index];
+          gem.setScrollFactor(0).setPosition(gem.x - cam.scrollX, gem.y - cam.scrollY);
+          this.tweens.add({
+            targets: gem, x: slot.x, y: slot.y, scale: 1, duration: 520, ease: 'Quad.easeIn',
+            onComplete: () => {
+              gem.destroy();
+              this.drawGems();
+              this.tweens.add({ targets: slot, scale: 1.7, duration: 140, yoyo: true });
+            },
+          });
+        });
+      },
+    });
+  }
+
+  drawGems() {
+    if (!this.gemIcons) return;
+    const got = GAME.progress.gems(this.world.id);
+    this.gemIcons.forEach((ic, i) => {
+      if (got.includes(i)) ic.clearTint().setAlpha(1); else ic.setTint(0x2a2440).setAlpha(0.8);
+    });
   }
 
   /** Is the kid standing on slippery ice? */
@@ -370,6 +445,9 @@ GAME.PlayScene = class PlayScene extends Phaser.Scene {
         this.cameras.main.shake(70, 0.004);
       }
     }
+    for (const c of this.chests) {
+      if (!c.open && Phaser.Geom.Intersects.RectangleToRectangle(r, c.img.getBounds())) this.openChest(c);
+    }
   }
 
   updateSwing(time) {
@@ -483,13 +561,11 @@ GAME.PlayScene = class PlayScene extends Phaser.Scene {
     return pk;
   }
 
-  /** A munny popping out of a defeated Heartless. */
-  dropMunny(x, y) {
-    const pk = this.addPickup('munny', x, y);
-    pk.readyAt = this.time.now + 300;
-    this.tweens.killTweensOf(pk.img);
-    this.tweens.add({ targets: pk.img, y: y - 18, duration: 180, ease: 'Quad.easeOut', yoyo: true,
-      onComplete: () => this.tweens.add({ targets: pk.img, scaleX: 0.35, duration: 380, yoyo: true, repeat: -1 }) });
+  /** A beaten enemy lets go of a heart -- when the kid could use one. Coins
+   *  only come from the level, so the coin percentage means "how much of
+   *  this world you found". */
+  dropReward(x, y) {
+    if (this.hearts < GAME.COMBAT.hearts) this.dropHeart(x, y, this.player.x);
   }
 
   /** A heart tossed by the Disney friend, landing near the kid. */
@@ -509,7 +585,7 @@ GAME.PlayScene = class PlayScene extends Phaser.Scene {
       if (!pk.live || now < pk.readyAt) continue;
       if (Math.abs(pk.img.x - cx) < b.width / 2 + 7 && Math.abs(pk.img.y - cy) < b.height / 2 + 7) {
         pk.live = false;
-        if (pk.kind === 'munny') { this.munny++; this.munnyText.setText('x' + this.munny); this.fx.sparkles(pk.img.x, pk.img.y, 0xffd23f, 5); }
+        if (pk.kind === 'munny') { this.coins++; this.drawCoins(); this.fx.sparkles(pk.img.x, pk.img.y, 0xffd23f, 5); }
         else { this.hearts = Math.min(GAME.COMBAT.hearts, this.hearts + 1); this.drawHearts(); this.fx.sparkles(pk.img.x, pk.img.y, 0xff7fb2, 8); }
         this.tweens.killTweensOf(pk.img);
         this.tweens.add({ targets: pk.img, y: pk.img.y - 10, alpha: 0, duration: 200, onComplete: () => pk.img.destroy() });
@@ -531,14 +607,16 @@ GAME.PlayScene = class PlayScene extends Phaser.Scene {
     const p = this.player;
     for (const s of this.saves) {
       if (time > s.nextRise) { this.fx.rise(s.x, s.y - 4, s.on ? 0x7cffb8 : 0x9fb4ff); s.nextRise = time + 260; }
-      if (!s.on && Math.abs(p.x - s.x) < 16 && Math.abs(p.y - s.y) < 20) {
+      // Walking through it or flying over it both count, like crossing a
+      // checkpoint line (a kid leaping off a sky ledge passes far above).
+      if (!s.on && Math.abs(p.x - s.x) < 20 && p.y < s.y + 8) {
         s.on = true;
         s.ring.setFrame(1);
         s.beam.setFillStyle(0x7cffb8, 0.16);
         this.respawn = { x: s.x, y: s.y };
         this.hearts = GAME.COMBAT.hearts; this.drawHearts();      // save points heal, like in KH
         this.fx.sparkles(s.x, s.y - 20, 0x7cffb8, 14);
-        this.fx.say(s.x, s.y - 60, 'SAVED!');
+        this.fx.say(s.x, Math.min(s.y, p.y) - 60, 'SAVED!');   // where the kid can see it
       }
     }
   }
@@ -611,9 +689,16 @@ GAME.PlayScene = class PlayScene extends Phaser.Scene {
     L(this.add.rectangle(0, 0, W, H, 0x120a1e, 0.72).setOrigin(0));
     const t1 = L(GAME.text(this, W / 2, 104, 'WORLD SEALED!', 16, '#fff3d0').setOrigin(0.5, 0)).setStroke('#7a3a1a', 4);
     L(GAME.text(this, W / 2, 132, this.world.name.toUpperCase(), 8, '#ffd27c').setOrigin(0.5, 0));
-    L(this.add.image(W / 2 - 20, 166, 'munny').setScale(2));
-    L(GAME.text(this, W / 2 - 4, 162, 'x' + this.munny, 8, '#ffffff'));
+    const pct = this.coinPct();
+    L(this.add.image(W / 2 - 46, 166, 'munny').setScale(2));
+    L(GAME.text(this, W / 2 - 34, 162, pct + '%', 8, pct >= 100 ? '#ffe27a' : '#ffffff'));
+    const got = GAME.progress.gems(this.world.id);
+    for (let i = 0; i < 3; i++) {
+      const g = L(this.add.image(W / 2 + 10 + i * 20, 166, 'gem'));
+      if (!got.includes(i)) g.setTint(0x2a2440).setAlpha(0.8);
+    }
     GAME.progress.seal(this.world.id);
+    GAME.progress.addCoins(this.world.id, pct);
     const go = L(GAME.text(this, W / 2, 214, 'TAP TO CONTINUE', 8, '#fff3d0').setOrigin(0.5, 0));
     this.tweens.add({ targets: t1, scale: 1.08, duration: 500, yoyo: true, repeat: -1 });
     this.tweens.add({ targets: go, alpha: 0.3, duration: 600, yoyo: true, repeat: -1 });
@@ -632,10 +717,29 @@ GAME.PlayScene = class PlayScene extends Phaser.Scene {
       this.heartIcons.push(this.add.image(8 + i * 13, 8, 'heart', 0).setOrigin(0).setScrollFactor(0).setDepth(1000));
     }
     this.add.image(8, 24, 'munny').setOrigin(0).setScrollFactor(0).setDepth(1000);
-    this.munnyText = GAME.text(this, 20, 24, 'x0', 8, '#ffffff').setScrollFactor(0).setDepth(1000).setStroke('#2a1220', 3);
+    this.coinText = GAME.text(this, 20, 24, '0%', 8, '#ffffff').setScrollFactor(0).setDepth(1000).setStroke('#2a1220', 3);
+    // Star Gem slots, top centre.
+    this.gemIcons = [];
+    if (this.textures.exists('gem')) {
+      for (let i = 0; i < 3; i++) {
+        this.gemIcons.push(this.add.image(W / 2 - 22 + i * 22, 14, 'gem').setScrollFactor(0).setDepth(1000));
+      }
+      this.drawGems();
+    }
     const menu = GAME.text(this, W - 8, 8, 'MENU', 8, '#fff3d0').setOrigin(1, 0)
       .setScrollFactor(0).setDepth(1000).setStroke('#2a1220', 3).setInteractive({ useHandCursor: true });
     menu.on('pointerdown', () => this.scene.start('worlds', { characterId: this.char.id }));
+  }
+
+  /** Share of this level's coins collected, 0-100 (100 only when all are). */
+  coinPct() {
+    return this.coinTotal ? Math.floor(100 * this.coins / this.coinTotal) : 0;
+  }
+
+  drawCoins() {
+    const pct = this.coinPct();
+    this.coinText.setText(pct + '%').setColor(pct >= 100 ? '#ffe27a' : '#ffffff');
+    if (pct >= 100) this.fx.say(this.player.x, this.player.y - 70, 'ALL COINS!');
   }
 
   drawHearts() {

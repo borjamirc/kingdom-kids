@@ -20,6 +20,25 @@ GAME.progress = {
     try { localStorage.setItem(this.KEY, JSON.stringify(p)); } catch (e) { /* private mode */ }
   },
   sealed(worldId) { return !!(this.load().sealed || {})[worldId]; },
+  /** Star Gems found in a world, by their order in the level (left to right). */
+  gems(worldId) { return ((this.load().gems || {})[worldId]) || []; },
+  addGem(worldId, i) {
+    const p = this.load();
+    p.gems = p.gems || {};
+    const got = new Set(p.gems[worldId] || []);
+    got.add(i);
+    p.gems[worldId] = [...got].sort();
+    try { localStorage.setItem(this.KEY, JSON.stringify(p)); } catch (e) { /* private mode */ }
+  },
+  /** Best share of a world's coins ever collected in one run, 0-100. */
+  coins(worldId) { return ((this.load().coins || {})[worldId]) || 0; },
+  addCoins(worldId, pct) {
+    const p = this.load();
+    p.coins = p.coins || {};
+    if (pct <= (p.coins[worldId] || 0)) return;
+    p.coins[worldId] = pct;
+    try { localStorage.setItem(this.KEY, JSON.stringify(p)); } catch (e) { /* private mode */ }
+  },
 };
 
 GAME.WorldScene = class WorldScene extends Phaser.Scene {
@@ -50,7 +69,19 @@ GAME.WorldScene = class WorldScene extends Phaser.Scene {
       far.setCrop(tx, ty, cw, chh).setPosition(x - tx, y - ty);
       const frame = this.add.graphics();
       const name = GAME.text(this, x + cw / 2, y + chh + 10, w.name.toUpperCase(), 8, '#fff3d0').setOrigin(0.5, 0);
-      GAME.text(this, x + cw / 2, y + chh + 24, 'WORLD ' + (i + 1), 8, '#9a92b0').setOrigin(0.5, 0);
+      GAME.text(this, x + 6, y + chh + 24, 'WORLD ' + (i + 1), 8, '#9a92b0').setOrigin(0, 0);
+      // Star Gems found here: three slots, lit or dark.
+      const got = GAME.progress.gems(w.id);
+      for (let g = 0; g < 3; g++) {
+        const star = this.add.image(x + cw - 50 + g * 20, y + chh + 28, 'gem').setOrigin(0.5);
+        if (!got.includes(g)) star.setTint(0x2a2440).setAlpha(0.8);
+      }
+      // Best coin percentage, once there is one.
+      const pct = GAME.progress.coins(w.id);
+      if (pct > 0) {
+        this.add.image(x + cw / 2 - 22, y + chh + 28, 'munny').setOrigin(0.5);
+        GAME.text(this, x + cw / 2 - 14, y + chh + 24, pct + '%', 8, pct >= 100 ? '#ffe27a' : '#fff3d0').setOrigin(0, 0);
+      }
       if (GAME.progress.sealed(w.id)) {
         const k = this.add.image(x + cw - 18, y + 22, w.id + '-keyhole').setScale(0.5);
         this.tweens.add({ targets: k, y: k.y - 3, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });

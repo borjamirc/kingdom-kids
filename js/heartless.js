@@ -162,8 +162,7 @@ GAME.Shadow = class Shadow {
     this.state = 'dead';
     sc.fx.hit(s.x, s.y - 12);
     sc.fx.heartRelease(s.x, s.y - 16);
-    const drops = Math.random() < 0.25 ? 2 : Math.random() < 0.8 ? 1 : 0;
-    for (let i = 0; i < drops; i++) sc.dropMunny(s.x + (i ? 8 : -6), s.y - 8);
+    if (Math.random() < 0.5) sc.dropReward(s.x, s.y - 8);
     s.body.enable = false;
     s.anims.stop();
     sc.tweens.killTweensOf(s);

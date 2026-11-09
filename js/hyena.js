@@ -140,7 +140,7 @@ GAME.Hyena = class Hyena {
     const s = this.sprite, sc = this.scene;
     this.state = 'dead';
     sc.fx.say(s.x, s.y - 30, this.voice.beaten);
-    sc.dropMunny(s.x - 6, s.y - 8); sc.dropMunny(s.x + 8, s.y - 8);
+    sc.dropReward(s.x, s.y - 8);
     s.body.enable = false;
     s.clearTint(); sc.tweens.killTweensOf(s); s.setAngle(0);
     // Runs away, embarrassed, instead of dying.

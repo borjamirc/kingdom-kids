@@ -248,7 +248,13 @@ WORLDS = {
     'pride': dict(src='art/gen/src', out='art/world/pride', sprites=SPRITES_PRIDE,
                   terrain=[('G', 'earth_tex.png', 14, None, 'lip'),
                            ('R', 'rock_tex.png', 14, [0.96, 0.84, 0.74], 'rim')],
-                  slippery=[], trees=('acacias.png', [118, 138, 112], 22), shared_from=None),
+                  slippery=[], trees=('acacias.png', [118, 138, 112], 22), shared_from=None,
+                  # the hippo bounce pad is bigger than a snow pad; crumbling
+                  # sandstone is the platform art, cracked (see cracked_platform)
+                  bounce_w=58, crumble_src='platform.png',
+                  # the hippo's pink belly and cheeks are too close to magenta
+                  # for the colour key: cut it out by its outline instead
+                  bounce_key='flood'),
     'arendelle': dict(src='art/gen/arendelle', out='art/world/arendelle', sprites=SPRITES_ARENDELLE,
                       terrain=[('G', 'earth_tex.png', 14, None, 'lip'),
                                ('R', 'ice_tex.png', 14, {'mul': [0.86, 0.92, 0.98], 'sat': 0.62}, 'rim'),
@@ -587,6 +593,8 @@ def build_tiles():
 
 PLATFORM_H = 28          # floating platform height on screen, grass to roots
 BOUNCE_W = 44
+CHEST_H = 22
+GEM_H = 18
 SAVE_W = 56
 KEYHOLE_H = 76
 
@@ -667,9 +675,12 @@ def build_platform():
 
 
 def build_crumble():
-    """Crumbling ice: a 4-tile platform that cracks and drops after you land."""
-    left, mid, right, surface = platform_pieces('crumble.png')
-    img = np.concatenate([left, mid[:, :2 * TILE], right], 1)
+    """Crumbling platform: 4 tiles that crack and drop after you land."""
+    if os.path.exists(f'{SRC}/crumble.png'):
+        left, mid, right, surface = platform_pieces('crumble.png')
+        img = np.concatenate([left, mid[:, :2 * TILE], right], 1)
+    else:
+        img, surface = cracked_platform()
     Image.fromarray(img, 'RGBA').save(f'{WORLD}/crumble.png')
     path, world = world_meta()
     world['crumble'] = {'size': [img.shape[1], img.shape[0]], 'surface': surface}
@@ -677,12 +688,55 @@ def build_crumble():
     print('  crumble:', img.shape[1], 'x', img.shape[0])
 
 
+def cracked_platform():
+    """No generated crumble art: crack this world's own platform instead --
+    left cap, two middles, right cap, darkened, with jagged dark cracks."""
+    sheet = np.asarray(Image.open(f'{WORLD}/platform.png').convert('RGBA'))
+    path, world = world_meta()
+    fw = world['platform']['frame'][0]
+    piece = lambda i: sheet[:, i * fw:(i + 1) * fw]
+    img = np.concatenate([piece(1), piece(2), piece(3), piece(5)], 1).astype(np.int32)
+    solid = img[..., 3] > 0
+    img[solid, :3] = (img[solid, :3] * 0.86).astype(np.int32)
+    rng = np.random.default_rng(11)
+    h, w = solid.shape
+    for x0 in range(6, w - 4, 11):                      # a crack every ~11px
+        x, y = x0 + int(rng.integers(-2, 3)), 1
+        while y < h - 2:
+            if solid[y, x]:
+                img[y, x, :3] = OUTLINE
+            y += 1
+            x = int(np.clip(x + rng.integers(-1, 2), 1, w - 2))
+    surface = world['platform']['surface']
+    return img.astype(np.uint8), surface
+
+
+def load_flood(name, tol=90):
+    """Background = the magenta reachable from the image border; everything
+    the dark outline encloses stays, whatever its colour (a pink belly too)."""
+    a = np.asarray(Image.open(f'{SRC}/{name}').convert('RGB')).astype(np.float64)
+    bg = estimate_background(a)
+    near = np.linalg.norm(a - bg, axis=2) < tol
+    lab, _ = ndimage.label(near, structure=ST8)
+    edge = set(np.unique(np.concatenate([lab[0], lab[-1], lab[:, 0], lab[:, -1]]))) - {0}
+    alpha = (~np.isin(lab, list(edge))).astype(np.float64)
+    return a, alpha
+
+
 def build_bounce():
-    """Snow bounce pad (a single sprite; the game squashes it)."""
-    rgb, alpha = load_keyed('bounce_src.png')
-    owner, ids = find_figures(alpha, 1)
-    fig = cut_figure(rgb, alpha, owner, ids[0])
-    px = pixel_sprite(fig, (BOUNCE_W - 2) / fig.shape[1], 16)
+    """Bounce pad (a single sprite; the game squashes it)."""
+    if CFG.get('bounce_key') == 'flood':
+        rgb, alpha = load_flood('bounce_src.png')
+    else:
+        rgb, alpha = load_keyed('bounce_src.png')
+    # Only the pad itself -- no floating sparkles or sleepy Zzz's around it.
+    lab, n = ndimage.label(alpha >= 0.5, structure=ST8)
+    sizes = np.bincount(lab.ravel()); sizes[0] = 0
+    owner = (lab == int(np.argmax(sizes))).astype(int)
+    owner = ndimage.binary_fill_holes(owner).astype(int)
+    alpha = np.maximum(alpha, owner)
+    fig = cut_figure(rgb, alpha, owner, 1)
+    px = pixel_sprite(fig, (CFG.get('bounce_w', BOUNCE_W) - 2) / fig.shape[1], 16)
     Image.fromarray(px, 'RGBA').save(f'{WORLD}/bounce.png')
     path, world = world_meta()
     world['bounce'] = {'size': [px.shape[1], px.shape[0]]}
@@ -746,6 +800,48 @@ def build_keyhole():
     print('  keyhole:', px.shape[1], 'x', px.shape[0])
 
 
+def build_props():
+    """Shared by every world: the treasure chest (closed, open) and the Star
+    Gem. Built with the Pride Lands, loaded once by the game."""
+    if os.path.exists(f'{SRC}/chest_src.png'):
+        rgb, alpha = load_keyed('chest_src.png')
+        owner, ids = find_figures(alpha, 2, by_x=True)
+        figs = [cut_figure(rgb, alpha, owner, k) for k in ids]
+        f = (CHEST_H - 2) / figs[0].shape[0]                # same scale for both
+        pxs = [pixel_sprite(fg, f, 16) for fg in figs]
+        cw = max(p.shape[1] for p in pxs) + 2
+        ch = max(p.shape[0] for p in pxs) + 1
+        cells = []
+        for p in pxs:                                       # bottom-centre in one cell
+            c = np.zeros((ch, cw, 4), np.uint8)
+            c[ch - p.shape[0]:, (cw - p.shape[1]) // 2:(cw - p.shape[1]) // 2 + p.shape[1]] = p
+            cells.append(c)
+        Image.fromarray(np.concatenate(cells, 1), 'RGBA').save(f'{WORLD}/chest.png')
+        path, world = world_meta()
+        world['chest'] = {'frame': [cw, ch]}
+        json.dump(world, open(path, 'w'), indent=2)
+        print('  chest:', cw, 'x', ch)
+    if os.path.exists(f'{SRC}/gem_src.png'):
+        rgb, alpha = load_keyed('gem_src.png')
+        owner, ids = find_figures(alpha, 1)
+        fig = cut_figure(rgb, alpha, owner, ids[0])
+        px = pixel_sprite(fig, (GEM_H - 2) / fig.shape[0], 12).astype(np.float64)
+        # The glow keys out pale; put every pixel on a rich gold ramp by
+        # brightness (the dark outline stays dark).
+        lum = px[..., :3] @ np.array([0.299, 0.587, 0.114]) / 255.0
+        ramp = np.array([[26, 18, 30], [150, 70, 10], [235, 150, 20], [255, 214, 60], [255, 248, 200]], float)
+        t = np.clip((lum - 0.25) / 0.7, 0, 1) * (len(ramp) - 1)
+        i = np.minimum(np.floor(t).astype(int), len(ramp) - 2)
+        gold = ramp[i] + (ramp[i + 1] - ramp[i]) * (t - i)[..., None]
+        keep = px[..., 3] > 0
+        px[keep, :3] = np.where((lum[keep] < 0.22)[:, None], px[keep, :3], gold[keep])
+        Image.fromarray(px.astype(np.uint8), 'RGBA').save(f'{WORLD}/gem.png')
+        path, world = world_meta()
+        world['gem'] = {'size': [px.shape[1], px.shape[0]]}
+        json.dump(world, open(path, 'w'), indent=2)
+        print('  gem:', px.shape[1], 'x', px.shape[0])
+
+
 def share(name, key):
     """Use another world's built sprite as is (the save point, the Keyhole)."""
     import shutil
@@ -759,7 +855,7 @@ def share(name, key):
 
 def build_scenery():
     for fn, src, shared in [(build_platform, 'platform.png', None),
-                            (build_crumble, 'crumble.png', None),
+                            (build_crumble, CFG.get('crumble_src', 'crumble.png'), None),
                             (build_bounce, 'bounce_src.png', None),
                             (build_trees, CFG['trees'][0], None),
                             (build_savepoint, 'savepoint_src.png', ('savepoint.png', 'savepoint')),
@@ -773,7 +869,7 @@ def build_scenery():
 
 
 PARTS = {'bg': [build_far, build_mid], 'kids': [build_kids], 'sprites': [build_sprites],
-         'tiles': [build_tiles], 'scenery': [build_scenery]}
+         'tiles': [build_tiles], 'scenery': [build_scenery], 'props': [build_props]}
 
 
 def main():
@@ -786,7 +882,7 @@ def main():
         del args[i:i + 2]
     CFG = WORLDS[world]
     SRC, WORLD = CFG['src'], CFG['out']
-    want = args or [p for p in PARTS if p != 'kids' or world == 'pride']
+    want = args or [p for p in PARTS if p not in ('kids', 'props') or world == 'pride']
     os.makedirs(WORLD, exist_ok=True)
     print('world:', world)
     for p in want:

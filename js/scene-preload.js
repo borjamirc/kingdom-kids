@@ -81,6 +81,15 @@ GAME.PreloadScene = class PreloadScene extends Phaser.Scene {
       this.load.spritesheet(w.id + '-savepoint', d + 'savepoint.png', { frameWidth: sf[0], frameHeight: sf[1] });
     }
 
+    // Shared props, built with the Pride Lands.
+    const props = this.cache.json.get(GAME.WORLDS[0].id + '-meta') || {};
+    const pd = GAME.WORLDS[0].art + '/';
+    if (props.chest) {
+      this.load.spritesheet('chest', pd + 'chest.png',
+        { frameWidth: props.chest.frame[0], frameHeight: props.chest.frame[1] });
+    }
+    if (props.gem) this.load.image('gem', pd + 'gem.png');
+
     // Every world's enemies and friend in one registry, keyed by name (the
     // Shadow is shared: the first world to list a name provides it).
     GAME.SPRITES = {};

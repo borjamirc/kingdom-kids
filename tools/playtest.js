@@ -73,6 +73,9 @@ window.PT = (() => {
         e.sprite.x - p.x < 90 && Math.abs(e.sprite.y - p.y) < 30).sort((a, c) => a.sprite.x - c.sprite.x)[0];
       const d = e ? e.sprite.x - p.x : 999;
       if (!opts.passive && e && d < s.char.attackReach + 6 && !s.swing && frame % 3 === 0) press.attack = true;
+      // A closed chest within reach: open it (passive bots too -- that's no fight).
+      const chest = s.chests.find(c => !c.open && Math.abs(c.x - p.x) < s.char.attackReach && Math.abs(c.y - p.y) < 30);
+      if (chest && !s.swing && frame % 3 === 0) { press.attack = true; s.facing = chest.x >= p.x ? 1 : -1; }
       const riding = s.movers.find(m => m.riding(b));
       if (riding) {
         if (riding.dy) {                                  // elevator: off at the top
@@ -107,7 +110,7 @@ window.PT = (() => {
         } else if (gap) {
           const slider = s.movers.find(m => m.dx && m.sprite.x > p.x - 40 && m.sprite.x - p.x < 220);
           if (slider) {
-            const near = slider.sprite.x - (p.x + 12) < 60;
+            const near = slider.sprite.x - (p.x + 12) < 76;
             press.right = false;
             if (near && jumpHold === 0) jumpHold = 18;
             if (jumpHold > 0) press.right = true;
@@ -127,7 +130,8 @@ window.PT = (() => {
     return {
       characterId, sealed: sealedAt >= 0, secs: +(frame / 60).toFixed(1),
       x: Math.round(s.player.x), maxX: Math.round(maxX), levelW: s.levelW,
-      hurts, falls, hits, munny: s.munny, log: log.slice(0, 10),
+      hurts, falls, hits, coins: s.coinPct() + '%',
+      chests: s.chests.filter(c => c.open).map(c => c.index).join(',') || '-', log: log.slice(0, 10),
     };
   }
 
