@@ -1,0 +1,4 @@
+{
+  "_comment": "Hand nudges applied on top of automatic head-size normalisation. A value of 0.88 shrinks that sheet to 88% of what the measurement chose. Delete an entry to fall back to pure measurement.",
+  "Pedro": { "attack": 0.88 }
+}

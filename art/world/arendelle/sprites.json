@@ -1,0 +1,46 @@
+{
+  "wolf": {
+    "frame": [
+      64,
+      44
+    ],
+    "body": [
+      40,
+      26
+    ],
+    "anims": {
+      "walk": [
+        0,
+        3
+      ]
+    },
+    "fps": {
+      "walk": 10
+    },
+    "source": "generated",
+    "crouch": 4,
+    "rest": 5
+  },
+  "olaf": {
+    "frame": [
+      30,
+      41
+    ],
+    "body": [
+      20,
+      30
+    ],
+    "anims": {
+      "walk": [
+        0,
+        3
+      ]
+    },
+    "fps": {
+      "walk": 9
+    },
+    "source": "generated",
+    "throw": 4,
+    "air": 5
+  }
+}

@@ -1,0 +1,212 @@
+{
+  "Baltazar": {
+    "cell": [
+      70,
+      45
+    ],
+    "anchor": [
+      29,
+      43
+    ],
+    "animations": {
+      "idle": 4,
+      "run": 6,
+      "jump": 6,
+      "attack": 4
+    },
+    "figure": [
+      42,
+      38
+    ],
+    "hand": [
+      21,
+      -31
+    ],
+    "bladeTip": [
+      21,
+      -40
+    ],
+    "generatedAttack": true,
+    "attackReach": 34,
+    "colors": 28,
+    "portrait": [
+      81,
+      86
+    ]
+  },
+  "Francisco": {
+    "cell": [
+      71,
+      66
+    ],
+    "anchor": [
+      27,
+      64
+    ],
+    "animations": {
+      "idle": 4,
+      "run": 6,
+      "jump": 6,
+      "attack": 4
+    },
+    "figure": [
+      28,
+      56
+    ],
+    "hand": [
+      23,
+      -41
+    ],
+    "bladeTip": [
+      21,
+      -52
+    ],
+    "generatedAttack": true,
+    "attackReach": 42,
+    "colors": 28,
+    "portrait": [
+      71,
+      127
+    ]
+  },
+  "Jo": {
+    "cell": [
+      93,
+      81
+    ],
+    "anchor": [
+      35,
+      79
+    ],
+    "animations": {
+      "idle": 4,
+      "run": 6,
+      "jump": 6,
+      "attack": 4
+    },
+    "figure": [
+      30,
+      66
+    ],
+    "hand": [
+      26,
+      -48
+    ],
+    "bladeTip": [
+      24,
+      -61
+    ],
+    "generatedAttack": true,
+    "attackReach": 56,
+    "colors": 28,
+    "portrait": [
+      82,
+      150
+    ]
+  },
+  "Olimpia": {
+    "cell": [
+      85,
+      76
+    ],
+    "anchor": [
+      33,
+      74
+    ],
+    "animations": {
+      "idle": 4,
+      "run": 6,
+      "jump": 6,
+      "attack": 4
+    },
+    "figure": [
+      30,
+      66
+    ],
+    "hand": [
+      26,
+      -48
+    ],
+    "bladeTip": [
+      24,
+      -61
+    ],
+    "generatedAttack": true,
+    "attackReach": 50,
+    "colors": 28,
+    "portrait": [
+      74,
+      150
+    ]
+  },
+  "Pedro": {
+    "cell": [
+      85,
+      78
+    ],
+    "anchor": [
+      26,
+      76
+    ],
+    "animations": {
+      "idle": 4,
+      "run": 6,
+      "jump": 6,
+      "attack": 4
+    },
+    "figure": [
+      30,
+      66
+    ],
+    "hand": [
+      26,
+      -49
+    ],
+    "bladeTip": [
+      24,
+      -62
+    ],
+    "generatedAttack": true,
+    "attackReach": 57,
+    "colors": 28,
+    "portrait": [
+      74,
+      150
+    ]
+  },
+  "Sara": {
+    "cell": [
+      87,
+      71
+    ],
+    "anchor": [
+      33,
+      69
+    ],
+    "animations": {
+      "idle": 4,
+      "run": 6,
+      "jump": 6,
+      "attack": 4
+    },
+    "figure": [
+      28,
+      66
+    ],
+    "hand": [
+      26,
+      -49
+    ],
+    "bladeTip": [
+      24,
+      -62
+    ],
+    "generatedAttack": true,
+    "attackReach": 52,
+    "colors": 28,
+    "portrait": [
+      84,
+      150
+    ]
+  }
+}

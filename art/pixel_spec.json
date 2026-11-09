@@ -1,0 +1,20 @@
+{
+  "_comment": "Input to tools/pixelize.py. 'height' is the kid's standing height on the 640x360 screen, in pixels, measured on the idle animation (outline included). 'anims' are the per-action size corrections hand-tuned on the phone, relative to idle. Jo, Pedro and Sara are set to Olimpia's height; Francisco and Baltazar keep the sizes they already had.",
+  "design": [960, 540],
+  "internal": [640, 360],
+  "palette": 28,
+  "outline": [26, 18, 30],
+  "attackFrame": 3,
+  "attackSource": "art/gen/attack",
+  "attackReadyRatio": 0.96,
+  "portraitMaxHeight": 150,
+  "portraitMaxWidth": 98,
+  "characters": {
+    "Baltazar":  { "height": 39, "anims": { "idle": 0.92, "run": 1.00, "jump": 0.90, "attack": 1.00 } },
+    "Francisco": { "height": 56, "anims": { "idle": 0.90, "run": 1.00, "jump": 0.98, "attack": 0.92 } },
+    "Jo":        { "height": 66, "anims": { "idle": 1.00, "run": 0.96, "jump": 1.04, "attack": 1.00 } },
+    "Olimpia":   { "height": 66, "anims": { "idle": 1.00, "run": 0.90, "jump": 1.10, "attack": 1.04 } },
+    "Pedro":     { "height": 66, "anims": { "idle": 1.00, "run": 1.06, "jump": 0.98, "attack": 0.98 } },
+    "Sara":      { "height": 67, "anims": { "idle": 1.00, "run": 1.20, "jump": 1.10, "attack": 1.00 } }
+  }
+}

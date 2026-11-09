@@ -1,0 +1,73 @@
+{
+  "shadow": {
+    "frame": [
+      40,
+      34
+    ],
+    "body": [
+      16,
+      26
+    ],
+    "anims": {
+      "walk": [
+        0,
+        3
+      ],
+      "lunge": [
+        5,
+        5
+      ]
+    },
+    "fps": {
+      "walk": 8,
+      "lunge": 1
+    },
+    "source": "generated",
+    "crouch": 4,
+    "puddle": 6
+  },
+  "simba": {
+    "frame": [
+      40,
+      33
+    ],
+    "body": [
+      30,
+      22
+    ],
+    "anims": {
+      "walk": [
+        0,
+        3
+      ]
+    },
+    "fps": {
+      "walk": 10
+    },
+    "source": "generated",
+    "crouch": 4,
+    "pounce": 5
+  },
+  "hyena": {
+    "frame": [
+      56,
+      38
+    ],
+    "body": [
+      40,
+      26
+    ],
+    "anims": {
+      "walk": [
+        0,
+        3
+      ]
+    },
+    "fps": {
+      "walk": 10
+    },
+    "source": "generated",
+    "crouch": 4,
+    "rest": 5
+  }
+}

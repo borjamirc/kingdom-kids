@@ -1,0 +1,13 @@
+# Source art stays on this computer: it's large (~220 MB), and it includes the
+# original drawings of the kids. The game only needs the built pixel art in
+# art/pixel and art/world.
+art/raw/
+art/sheets/
+art/portraits/
+art/gen/
+art/report.json
+
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db

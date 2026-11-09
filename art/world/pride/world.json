@@ -1,0 +1,94 @@
+{
+  "tile": 16,
+  "tiles": 20,
+  "shadow": {
+    "frame": [
+      28,
+      28
+    ],
+    "frames": 7
+  },
+  "simba": {
+    "frame": [
+      44,
+      32
+    ],
+    "frames": 5
+  },
+  "keyblade": {
+    "size": [
+      30,
+      14
+    ],
+    "grip": [
+      5,
+      5
+    ]
+  },
+  "swoosh": {
+    "size": [
+      66,
+      66
+    ]
+  },
+  "savepoint": {
+    "frame": [
+      54,
+      27
+    ]
+  },
+  "tileset": {
+    "variants": 8,
+    "kindStride": 64,
+    "terrain": {
+      "G": 0,
+      "R": 512
+    },
+    "ledge": 1024,
+    "solidMax": 1023,
+    "count": 1028,
+    "fringe": 8,
+    "slippery": []
+  },
+  "platform": {
+    "frame": [
+      16,
+      26
+    ],
+    "surface": 0,
+    "mids": 3,
+    "frames": {
+      "single": 0,
+      "left": 1,
+      "mid": 2,
+      "right": 5
+    }
+  },
+  "mover": {
+    "size": [
+      80,
+      26
+    ],
+    "surface": 0
+  },
+  "keyhole": {
+    "size": [
+      53,
+      71
+    ]
+  },
+  "trees": [
+    [
+      188,
+      116
+    ],
+    [
+      126,
+      136
+    ],
+    [
+      213,
+      110
+    ]
+  ]
+}
