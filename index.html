@@ -104,6 +104,61 @@
 <script src="js/scene-play.js"></script>
 <script src="js/main.js"></script>
 <script>
+// Fit the game to what's really on screen. An iPhone home-screen app can
+// misreport its size after turning sideways (and leave the page shifted), so a
+// canvas fitted to the CSS box hangs off the screen -- the MENU button with
+// it. The box is sized here from the visible area (visualViewport), minus the
+// notch and home-bar insets, and re-fitted a few times while a rotation settles.
+(function () {
+  var probe = document.createElement('div');
+  probe.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;' +
+    'padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)';
+  document.body.appendChild(probe);
+  var fit = function () {
+    var box = document.getElementById('game');
+    if (!box) return;
+    var cs = getComputedStyle(probe), px = function (v) { return parseFloat(v) || 0; };
+    var t = px(cs.paddingTop), r = px(cs.paddingRight), b = px(cs.paddingBottom), l = px(cs.paddingLeft);
+    var vv = window.visualViewport;
+    var w = vv ? vv.width : window.innerWidth, h = vv ? vv.height : window.innerHeight;
+    var ox = vv ? vv.offsetLeft : 0, oy = vv ? vv.offsetTop : 0;
+    if (window.scrollX || window.scrollY) window.scrollTo(0, 0);   // undo a leftover shift
+    box.style.left = (ox + l) + 'px'; box.style.top = (oy + t) + 'px';
+    box.style.right = 'auto'; box.style.bottom = 'auto';
+    box.style.width = Math.max(0, w - l - r) + 'px'; box.style.height = Math.max(0, h - t - b) + 'px';
+    // Only once Phaser has booted (before that there's no canvas to fit, and
+    // it measures the box itself when it boots).
+    if (window.GAME && GAME.game && GAME.game.isBooted && GAME.game.scale && GAME.game.scale.canvas) {
+      try {
+        GAME.game.scale.getParentBounds();      // re-measure the box first, or refresh() reuses the old size
+        GAME.game.scale.refresh();
+      } catch (e) { /* never let fitting break the game */ }
+    }
+  };
+  var soon = function () { fit(); setTimeout(fit, 150); setTimeout(fit, 500); setTimeout(fit, 1200); };
+  window.addEventListener('orientationchange', soon);
+  window.addEventListener('resize', soon);
+  window.addEventListener('pageshow', soon);
+  document.addEventListener('visibilitychange', soon);
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', soon);
+    window.visualViewport.addEventListener('scroll', soon);
+  }
+  soon();
+  GAME.fit = soon;              // main.js calls this once the game exists
+  // And in case no event comes at all: once a second, re-fit if the box no
+  // longer matches what's visible.
+  GAME.fitCheck = function () {
+    var box = document.getElementById('game'), vv = window.visualViewport;
+    if (!box) return false;
+    var w = vv ? vv.width : window.innerWidth, h = vv ? vv.height : window.innerHeight;
+    var r = box.getBoundingClientRect();
+    if (r.right > w + 2 || r.bottom > h + 2 || r.left < -2 || r.top < -2 || r.width < w * 0.6) { fit(); return true; }
+    return false;
+  };
+  setInterval(GAME.fitCheck, 1000);
+})();
+
 // Offline play for the home-screen app. Only over https (GitHub Pages), so
 // the local dev server never serves stale cached files.
 if ('serviceWorker' in navigator && location.protocol === 'https:') {

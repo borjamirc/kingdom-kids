@@ -18,7 +18,7 @@ GAME.SelectScene = class SelectScene extends Phaser.Scene {
     this.mid = this.add.tileSprite(0, 0, W, H, world.id + '-mid').setOrigin(0);
     this.floorBand = this.add.rectangle(0, 252, W, H - 252, 0x1b1028, 0.6).setOrigin(0);
 
-    const title = GAME.text(this, W / 2, 22, 'CHOOSE YOUR KID', 16, '#fff3d0');
+    const title = GAME.text(this, W / 2, 22, 'CHOOSE YOUR CHARACTER', 16, '#fff3d0');
     title.setOrigin(0.5, 0).setShadow(2, 2, '#3a1a3a', 0, false, true);
     GAME.text(this, W / 2, 46, 'THEN PICK A WORLD', 8, '#ffd27c').setOrigin(0.5, 0);
 
@@ -38,7 +38,7 @@ GAME.SelectScene = class SelectScene extends Phaser.Scene {
       this.slots.push({ c, img, label, frame, cx });
     });
 
-    const hint = GAME.text(this, W / 2, H - 28, 'TAP A KID TO PLAY', 8, '#fff3d0').setOrigin(0.5, 0);
+    const hint = GAME.text(this, W / 2, H - 28, 'TAP A CHARACTER TO PLAY', 8, '#fff3d0').setOrigin(0.5, 0);
     this.tweens.add({ targets: hint, alpha: 0.35, duration: 700, yoyo: true, repeat: -1 });
 
     this.index = 0;

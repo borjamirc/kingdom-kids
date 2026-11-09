@@ -5,8 +5,14 @@
  * game; every file that loads is also kept in a cache, and when there's no
  * connection the cached copy is used instead. The first visit has to be
  * online (that's what fills the cache).
+ *
+ * The game's own files are always re-checked with the server ('no-cache'):
+ * GitHub Pages lets browsers reuse a file for 10 minutes without asking, so
+ * right after an update a phone could mix new files with old ones (a new
+ * play screen calling a helper an old characters.js doesn't have). A re-check
+ * that finds nothing new costs one tiny 304 reply.
  * ------------------------------------------------------------------------- */
-const CACHE = 'kingdom-kids-v1';
+const CACHE = 'kingdom-kids-v2';
 
 self.addEventListener('install', () => self.skipWaiting());
 
@@ -23,7 +29,8 @@ self.addEventListener('fetch', (event) => {
   event.respondWith((async () => {
     const cache = await caches.open(CACHE);
     try {
-      const res = await fetch(req);
+      const own = new URL(req.url).origin === self.location.origin;
+      const res = await fetch(own ? new Request(req.url, { cache: 'no-cache' }) : req);
       // ok responses, plus opaque ones from the font CDN (no-cors)
       if (res.ok || res.type === 'opaque') cache.put(req, res.clone());
       return res;

@@ -34,6 +34,7 @@ GAME.start = function () {
 
     scene: [GAME.PreloadScene, GAME.SelectScene, GAME.WorldScene, GAME.PlayScene],
   });
+  if (GAME.fit) GAME.fit();     // size the box to the real screen (index.html)
 };
 
 // Wait for the pixel font, or the first frame of text renders in a fallback
